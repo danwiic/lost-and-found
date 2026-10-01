@@ -1,0 +1,53 @@
+import type { NextRequest } from 'next/server'
+import { conflict, handleRoute, json, readBody } from '@/lib/api'
+import { attachSessionCookie, createSessionToken, hashPassword } from '@/lib/auth'
+import { prisma } from '@/lib/db'
+import { Fields } from '@/lib/validation'
+
+export const dynamic = 'force-dynamic'
+
+/** Creates a student account and signs it in straight away. */
+export async function POST(request: NextRequest) {
+  return handleRoute(async () => {
+    const body = await readBody(request)
+    const fields = new Fields(body)
+
+    const name = fields.requiredText('name', 'Full name', { min: 2, max: 120 })
+    const email = fields.email('email', 'Email', { required: true })
+    const password = fields.password('password', 'Password')
+    const studentId = fields.optionalText('studentId', 'Student / personnel ID', { max: 60 })
+    const contact = fields.optionalText('contact', 'Contact information', { max: 120 })
+    fields.throwIfInvalid()
+
+    // `email` and `password` are guaranteed non-empty once validation passes.
+    const emailAddress = email as string
+
+    const existing = await prisma.user.findUnique({
+      where: { email: emailAddress },
+      select: { id: true },
+    })
+    if (existing) {
+      throw conflict('An account with that email already exists.')
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email: emailAddress,
+        passwordHash: await hashPassword(password),
+        studentId: studentId ?? null,
+        contact: contact ?? null,
+      },
+      select: { id: true, name: true, email: true, studentId: true, contact: true, role: true },
+    })
+
+    const token = await createSessionToken({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: 'USER',
+    })
+
+    return attachSessionCookie(json({ user: { ...user, role: 'USER' } }, 201), token)
+  })
+}

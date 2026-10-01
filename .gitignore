@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# prisma generated client (regenerate with: npm run db:generate)
+src/generated/
+
+# runtime data (photos + baked model cache)
+uploads/
+.model-cache/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# typescript
+*.tsbuildinfo
+
+# misc
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+
+
+# model cache
+embedder/model-cache/

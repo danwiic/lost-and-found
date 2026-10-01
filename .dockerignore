@@ -1,0 +1,18 @@
+# Keep the app build context lean. The embedder has its own context
+# (embedder/.dockerignore); the 2.4 GB model cache must never leak into this one.
+node_modules
+.next
+out
+.git
+.gitignore
+.env
+.env.local
+uploads
+.model-cache
+embedder
+src/generated
+*.tsbuildinfo
+*.log
+tmp-*
+compose-up.log
+README.md

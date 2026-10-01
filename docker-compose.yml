@@ -1,0 +1,80 @@
+services:
+  # Internal-only image-matching sidecar: clip-ViT-L/14 behind POST /embed.
+  # No host port is published — the app reaches it at http://embedder:8000 and
+  # nothing else can. The model is baked into its image at build time.
+  embedder:
+    build: ./embedder
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      # The model (1.7 GB) loads once at boot; give it room before failing.
+      start_period: 120s
+
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lostfound}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lostfound}
+      POSTGRES_DB: ${POSTGRES_DB:-lostfound}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      # Photo matching is dead without it, so the app waits for the model.
+      embedder:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lostfound}:${POSTGRES_PASSWORD:-lostfound}@db:5432/${POSTGRES_DB:-lostfound}
+      AUTH_SECRET: ${AUTH_SECRET:-change-me-in-env}
+      SESSION_TTL_DAYS: ${SESSION_TTL_DAYS:-7}
+      # Keep 0 for http://localhost — a secure cookie would not be sent.
+      COOKIE_SECURE: ${COOKIE_SECURE:-0}
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-8}
+      EMBEDDER_URL: http://embedder:8000
+      # Scores are calibrated (raw cosine minus baseline, rescaled to 0-1)
+      # before they are thresholded or shown. Tune both from the raw=/calibrated=
+      # pairs in the [match] and [photo-search] log lines.
+      MATCH_BASELINE: ${MATCH_BASELINE:-0.6}
+      MATCH_THRESHOLD: ${MATCH_THRESHOLD:-0.87}
+      MATCH_TOP_K: ${MATCH_TOP_K:-10}
+      MATCH_COLOR_BOOST: ${MATCH_COLOR_BOOST:-0.02}
+      # Below-threshold "closest on file" leads shown by the read-only photo search.
+      PHOTO_SEARCH_NEAR_MISSES: ${PHOTO_SEARCH_NEAR_MISSES:-3}
+      PHOTO_SEARCH_NEAR_MISS_FLOOR: ${PHOTO_SEARCH_NEAR_MISS_FLOOR:-0.6}
+    ports:
+      - '3000:3000'
+    volumes:
+      - uploads:/app/uploads
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  pgdata:
+  uploads:

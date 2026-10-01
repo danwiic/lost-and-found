@@ -1,0 +1,8 @@
+# The Docker entrypoint must use LF or /bin/sh cannot execute it.
+* text=auto
+*.sh text eol=lf
+*.mjs text eol=lf
+*.png binary
+*.jpg binary
+*.webp binary
+*.onnx binary

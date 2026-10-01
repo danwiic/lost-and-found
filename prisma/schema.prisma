@@ -1,0 +1,168 @@
+// Lost and Found System — data model.
+//
+// NOTE: pgvector has no native Prisma type, so Item.embedding is declared as
+// Unsupported("vector(768)") — clip-ViT-L/14, served by the embedder sidecar.
+// Prisma Client therefore cannot read or write that column through the normal
+// API: use $queryRaw / $executeRaw (see src/lib/embed.ts and src/lib/match.ts).
+// The extension itself is created by the first migration.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ItemType {
+  LOST
+  FOUND
+}
+
+enum ItemStatus {
+  PENDING
+  POSSIBLE_MATCH
+  CLAIM_PENDING
+  RETURNED
+  CLOSED
+}
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  POSSIBLE_MATCH
+  CLAIM_SUBMITTED
+  CLAIM_APPROVED
+  CLAIM_REJECTED
+  ITEM_RETURNED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  studentId    String?
+  contact      String?
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  items         Item[]         @relation("ItemReporter")
+  claims        Claim[]        @relation("Claimant")
+  decidedClaims Claim[]        @relation("ClaimDecision")
+  notifications Notification[]
+  releases      ReturnRecord[] @relation("ReleasedBy")
+}
+
+model Item {
+  id                String   @id @default(cuid())
+  type              ItemType
+  name              String
+  description       String
+  color             String?
+  dateEvent         DateTime
+  location          String
+  additionalDetails String?
+  /// File name inside UPLOAD_DIR (never an absolute path).
+  imagePath         String?
+  /// CLIP ViT-L/14 embedding: 768 dimensions, L2 normalised.
+  embedding         Unsupported("vector(768)")?
+  status            ItemStatus @default(PENDING)
+  reporterId        String
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  reporter     User           @relation("ItemReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  lostMatches  Match[]        @relation("MatchLostItem")
+  foundMatches Match[]        @relation("MatchFoundItem")
+  claims       Claim[]
+  returns      ReturnRecord[]
+
+  @@index([type, status])
+  @@index([reporterId, type])
+  @@index([createdAt])
+}
+
+model Match {
+  id          String   @id @default(cuid())
+  lostItemId  String
+  foundItemId String
+  similarity  Float
+  createdAt   DateTime @default(now())
+
+  lostItem  Item @relation("MatchLostItem", fields: [lostItemId], references: [id], onDelete: Cascade)
+  foundItem Item @relation("MatchFoundItem", fields: [foundItemId], references: [id], onDelete: Cascade)
+
+  @@unique([lostItemId, foundItemId])
+  @@index([lostItemId])
+  @@index([foundItemId])
+}
+
+model Claim {
+  id                String      @id @default(cuid())
+  itemId            String
+  claimantId        String
+  claimantName      String
+  studentId         String?
+  contact           String
+  additionalDetails String?
+  /// Free-text proof of ownership supplied by the claimant.
+  proof             String?
+  status            ClaimStatus @default(PENDING)
+  decisionNote      String?
+  decidedById       String?
+  decidedAt         DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  item      Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  claimant  User           @relation("Claimant", fields: [claimantId], references: [id], onDelete: Cascade)
+  decidedBy User?          @relation("ClaimDecision", fields: [decidedById], references: [id], onDelete: SetNull)
+  returns   ReturnRecord[]
+
+  @@index([itemId, status])
+  @@index([claimantId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  message   String
+  matchId   String?
+  claimId   String?
+  itemId    String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}
+
+model ReturnRecord {
+  id           String   @id @default(cuid())
+  itemId       String
+  claimId      String?
+  returnDate   DateTime
+  notes        String?
+  releasedById String
+  createdAt    DateTime @default(now())
+
+  item       Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  claim      Claim? @relation(fields: [claimId], references: [id], onDelete: SetNull)
+  releasedBy User   @relation("ReleasedBy", fields: [releasedById], references: [id], onDelete: Restrict)
+
+  @@index([itemId])
+}

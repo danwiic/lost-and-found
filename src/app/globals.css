@@ -1,0 +1,296 @@
+@import 'tailwindcss';
+
+/*
+ * ---------------------------------------------------------------------------
+ * Design tokens — the neutral system
+ * ---------------------------------------------------------------------------
+ * One sans-serif typeface, near-black ink on an off-white ground, a single
+ * accent for primary actions and active states, and neutral greys for
+ * structure. Tokens are named for what they mean, so screens added later stay
+ * consistent; values live here and nowhere else.
+ *
+ * Text/background contrast pairs are verified by `npm run audit:contrast`,
+ * which reads these values out of this file. Note that `ink-subtle` does not
+ * clear 4.5:1 on `surface-sunk` (4.40:1) and must never carry text there.
+ */
+@theme {
+  /* Ground and surfaces */
+  --color-canvas: #fafafa;
+  --color-rail: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-sunk: #f4f4f5;
+
+  /* Ink */
+  --color-ink: #0a0a0a;
+  --color-ink-muted: #52525b;
+  --color-ink-subtle: #71717a;
+
+  /* Structure */
+  --color-line: #e4e4e7;
+  --color-line-strong: #d4d4d8;
+
+  /* The one accent: primary actions, links, active states */
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-soft: #eef2ff;
+  /* Labels that sit on a solid accent or refused fill. */
+  --color-on-accent: #ffffff;
+
+  /* Meaning. Colour reinforces a status word, and never replaces it. */
+  --color-attention: #92400e; /* needs the user — possible match */
+  --color-attention-soft: #fffbeb;
+  --color-verified: #166534; /* approved, returned */
+  --color-verified-soft: #f0fdf4;
+  --color-refused: #b91c1c; /* rejected */
+  --color-refused-hover: #991b1b;
+  --color-refused-soft: #fef2f2;
+
+  /* Type */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, 'Cascadia Mono', monospace;
+
+  /* One radius across buttons, cards and inputs. `rounded-full` is reserved
+     for pills: status badges and the unread count. */
+  --radius-lg: 0.5rem;
+
+  /* Depth is elevation, not decoration: the popover, the drawer, the toast.
+     Cards carry a hairline border instead — never both. */
+  --shadow-lift: 0 4px 12px -2px rgb(9 9 11 / 0.08), 0 12px 32px -12px rgb(9 9 11 / 0.14);
+  --shadow-drawer: -16px 0 48px -20px rgb(9 9 11 / 0.2);
+
+  /* One exponential ease for every state transition. */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Hierarchy comes from weight and size, not from a second face. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.011em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+
+  /* ---------------------------------------------------------------------
+   * Browser surfaces belong to the palette. These are the parts nobody
+   * draws, and the cheapest signal that a page was built, not assembled.
+   * ------------------------------------------------------------------- */
+  :root {
+    caret-color: var(--color-accent);
+    accent-color: var(--color-accent);
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-accent) 18%, transparent);
+    color: var(--color-ink);
+  }
+
+  /* An outline only: setting a radius here would square off every focused
+     pill and card. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-line-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    /* audited by `npm run audit:contrast` — never a browser default grey */
+    color: var(--color-ink-subtle);
+  }
+
+  :disabled {
+    cursor: not-allowed;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /*
+   * One spacing scale, applied globally: 4 · 8 · 12 · 16 · 24 · 32 · 48.
+   * Tailwind's numeric utilities already land exactly on it — 1=4, 2=8, 3=12,
+   * 4=16, 6=24, 8=32, 12=48 — so those seven steps are the only ones used for
+   * padding, margin and gap anywhere in the interface. `npm run audit:spacing`
+   * reports anything off the scale, and `-- --fix` snaps it back.
+   *
+   * Layout rhythm, so no page has to invent its own:
+   *   page gutter   20px mobile / 32px desktop   (PageContainer)
+   *   page measure  1080 / 1240 @1280 / 1400 @1536 / 1520 @1900  (.page-measure)
+   *   card padding  24px                         (.card-pad, every bordered card)
+   *   section gap   32px                         (.page-stack)
+   *   block gap     16px                         (within a section)
+   *   tight gap     4 / 8 / 12px                 (label to field, chips, icons)
+   * Sections are always further apart than the elements inside them.
+   */
+  .page-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem; /* 32px between top-level sections */
+  }
+
+  /*
+   * The page measure. PageContainer owns width, so no page decides it, and the
+   * gutters (20px mobile, 32px from `sm`) sit beside this on the same element.
+   *
+   * The measure widens with the viewport, because 1080px of column is right on
+   * a laptop and wasteful on a monitor: at 1920px it left over a third of the
+   * screen as empty margin on both sides. Only the measure changes — the gutter
+   * never does, and prose stays inside 65–75ch via `.measure`.
+   *
+   * Written as plain media queries, not variant utilities, because the order is
+   * the cascade: Tailwind emits its own breakpoints in `@theme` order, which put
+   * a wider step before a narrower one and let the narrower one win.
+   */
+  .page-measure {
+    max-width: 1080px;
+  }
+
+  @media (min-width: 1280px) {
+    .page-measure {
+      max-width: 1240px;
+    }
+  }
+
+  @media (min-width: 1536px) {
+    .page-measure {
+      max-width: 1400px;
+    }
+  }
+
+  /* A 1900px-and-wider monitor can carry a wider desk without losing the eye. */
+  @media (min-width: 1900px) {
+    .page-measure {
+      max-width: 1520px;
+    }
+  }
+
+  /* Every white or bordered card pads its content the same way. */
+  .card-pad {
+    padding: 1.5rem; /* 24px */
+  }
+
+  /* Body copy measure stays inside 65–75ch. */
+  .measure {
+    max-width: 68ch;
+  }
+
+  /* Monospace is reserved for codes and small tags: the similarity reading,
+     the match threshold, and the API paths in the interim panel. It is never
+     a costume for "technical". */
+  .data {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* Tabular figures in the interface face, for tallies and counts. */
+  .nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* One authored moment: the similarity reading settling as the match drawer
+     opens. It resolves from an already-visible default — never a fade from
+     nothing. */
+  .reading-in {
+    animation: reading-in 420ms var(--ease-out-expo);
+  }
+
+  /* The drawer arrives as a record being pulled out: a soft edge, a short
+     travel, and a blur settling out. */
+  .drawer-panel {
+    animation: drawer-in 380ms var(--ease-out-expo);
+  }
+
+  .drawer-overlay {
+    animation: overlay-in 260ms var(--ease-out-expo);
+  }
+}
+
+@keyframes drawer-in {
+  from {
+    clip-path: inset(0 0 0 14%);
+    transform: translateX(10px);
+    filter: blur(2px);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes overlay-in {
+  from {
+    backdrop-filter: blur(0);
+  }
+  to {
+    backdrop-filter: blur(2px);
+  }
+}
+
+@keyframes reading-in {
+  from {
+    transform: scale(1.06);
+    filter: blur(1.5px);
+  }
+  to {
+    transform: none;
+    filter: none;
+  }
+}

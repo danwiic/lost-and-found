@@ -1,0 +1,6 @@
+# The model cache is copied into the image by the Dockerfile — keep everything
+# else out of this build context.
+*
+!model-cache
+!requirements.txt
+!main.py
