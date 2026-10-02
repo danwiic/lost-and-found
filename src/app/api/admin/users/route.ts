@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server'
+import { accountSearchWhere } from '@/lib/accounts'
 import { handleRoute, json } from '@/lib/api'
 import { requireAdmin } from '@/lib/auth'
 import { prisma } from '@/lib/db'
@@ -19,13 +20,7 @@ export async function GET(request: NextRequest) {
     if (q.length < 2) return json({ users: [] })
 
     const users = await prisma.user.findMany({
-      where: {
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
-          { studentId: { contains: q, mode: 'insensitive' } },
-        ],
-      },
+      where: accountSearchWhere(q),
       orderBy: { name: 'asc' },
       take: 8,
       select: { id: true, name: true, email: true, studentId: true },

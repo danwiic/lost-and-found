@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
         role: true,
         passwordHash: true,
         sessionEpoch: true,
+        mustChangePassword: true,
       },
     })
 
