@@ -1,22 +1,34 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { RecoverySection } from '@/components/auth/RecoverySection'
 import { SignOutButton } from '@/components/shell/SignOutButton'
 import { Badge } from '@/components/ui/Badge'
 import { buttonClass } from '@/components/ui/Button'
 import { Panel, PanelHeading } from '@/components/ui/Panel'
+import { prisma } from '@/lib/db'
+import { recoveryPrompt } from '@/lib/security-questions'
 import { requireSession } from '@/lib/session'
 
 export const metadata: Metadata = { title: 'Profile — Lost and Found' }
 
 /**
- * The account as OSAS holds it. Every value here is read-only: the backend
- * exposes no profile update endpoint, and a form that pretended to save would
- * be inventing a capability that does not exist (agents/UX.md §31.5). What a
- * person can actually change — their password, their ID — is done at the OSAS
- * office, and the page says so instead of offering a dead control.
+ * The account as OSAS holds it. The details themselves are read-only: the
+ * backend exposes no profile update endpoint, and a form that pretended to save
+ * would be inventing a capability that does not exist (agents/UX.md §31.5).
+ * Name, ID and contact are still corrected at the OSAS office.
+ *
+ * Account recovery is the exception, and deliberately so — the questions are
+ * the only thing a person can change here, because they are self-service by
+ * definition: waiting at the counter for them would defeat their purpose.
  */
 export default async function ProfilePage() {
   const user = await requireSession('/profile')
+
+  const answers = await prisma.securityAnswer.findMany({
+    where: { userId: user.id },
+    select: { questionKey: true },
+    orderBy: { createdAt: 'asc' },
+  })
 
   return (
     <div className="page-stack">
@@ -50,6 +62,24 @@ export default async function ProfilePage() {
           />
         </dl>
       </Panel>
+
+      <div id="recovery" className="scroll-mt-24">
+        <Panel>
+          <PanelHeading
+            title="Account recovery"
+            description="If you forget your password, these questions are the way back in."
+            action={
+              answers.length > 0 ? <Badge tone="accent">Set up</Badge> : <Badge>Not set up</Badge>
+            }
+          />
+          <RecoverySection
+            current={answers.map((answer) => ({
+              questionKey: answer.questionKey,
+              prompt: recoveryPrompt(answer.questionKey),
+            }))}
+          />
+        </Panel>
+      </div>
 
       <Panel>
         <PanelHeading

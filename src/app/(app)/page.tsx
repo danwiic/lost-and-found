@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { NoticeList } from '@/components/dashboard/NoticeList'
 import { RecordLedger } from '@/components/dashboard/RecordLedger'
+import { RecoveryPrompt } from '@/components/dashboard/RecoveryPrompt'
 import { buttonClass } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { Panel, PanelHeading } from '@/components/ui/Panel'
@@ -93,6 +94,8 @@ export default async function HomePage() {
           />
         </div>
       </header>
+
+      {data.showRecoveryPrompt ? <RecoveryPrompt /> : null}
 
       <Panel>
         <PanelHeading
