@@ -133,9 +133,18 @@ export function AdminItemList({
                     </h2>
 
                     <p className="mt-1 text-xs text-ink-muted">
-                      {record.reporterName ?? 'Unknown'} · {record.location} ·{' '}
-                      {formatDate(record.dateEvent)}
+                      {record.finderName
+                        ? `Handed in by ${record.finderName}`
+                        : (record.reporterName ?? 'Unknown')}{' '}
+                      · {record.location} · {formatDate(record.dateEvent)}
                     </p>
+                    {/* On an intake row the finder and the reporter are two
+                        different people; the record's owner gets its own line. */}
+                    {record.finderName ? (
+                      <p className="mt-1 text-xs text-ink-subtle">
+                        Recorded by {record.reporterName ?? 'unknown'}
+                      </p>
+                    ) : null}
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <Badge
