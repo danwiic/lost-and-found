@@ -47,7 +47,15 @@ export async function POST(request: NextRequest) {
         studentId: studentId ?? null,
         contact: contact ?? null,
       },
-      select: { id: true, name: true, email: true, studentId: true, contact: true, role: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        studentId: true,
+        contact: true,
+        role: true,
+        sessionEpoch: true,
+      },
     })
 
     const token = await createSessionToken({
@@ -55,8 +63,11 @@ export async function POST(request: NextRequest) {
       name: user.name,
       email: user.email,
       role: 'USER',
+      epoch: user.sessionEpoch,
     })
 
-    return attachSessionCookie(json({ user: { ...user, role: 'USER' } }, 201), token)
+    const { sessionEpoch: _sessionEpoch, ...safeUser } = user
+
+    return attachSessionCookie(json({ user: { ...safeUser, role: 'USER' } }, 201), token)
   })
 }

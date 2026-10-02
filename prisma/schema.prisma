@@ -48,6 +48,7 @@ enum MatchStatus {
 enum NotificationType {
   POSSIBLE_MATCH
   MATCH_CONFIRMED
+  PASSWORD_RESET
   CLAIM_SUBMITTED
   CLAIM_APPROVED
   CLAIM_REJECTED
@@ -62,15 +63,54 @@ model User {
   studentId    String?
   contact      String?
   role         Role     @default(USER)
+  /// Bumped by a password reset so every token signed before it is refused.
+  sessionEpoch Int      @default(0)
+  /// Consecutive wrong security answers; a run of them locks the questions.
+  recoveryAttempts      Int       @default(0)
+  /// Until this moment the security questions refuse every answer outright.
+  recoveryLockedUntil   DateTime?
+  /// When the "set up account recovery" prompt was last dismissed.
+  recoveryPromptHiddenAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  items          Item[]         @relation("ItemReporter")
-  claims         Claim[]        @relation("Claimant")
-  decidedClaims  Claim[]        @relation("ClaimDecision")
-  decidedMatches Match[]        @relation("MatchDecision")
-  notifications  Notification[]
-  releases      ReturnRecord[] @relation("ReleasedBy")
+  items           Item[]           @relation("ItemReporter")
+  claims          Claim[]          @relation("Claimant")
+  decidedClaims   Claim[]          @relation("ClaimDecision")
+  decidedMatches  Match[]          @relation("MatchDecision")
+  notifications   Notification[]
+  releases        ReturnRecord[]   @relation("ReleasedBy")
+  securityAnswers SecurityAnswer[]
+  passwordResets  PasswordReset[]
+}
+
+/// One hashed answer per question. The answer is stored the way a password is:
+/// bcrypt hash of a normalised string, never readable back by anyone.
+model SecurityAnswer {
+  id          String   @id @default(cuid())
+  userId      String
+  /// Key into the fixed question catalog in src/lib/security-questions.ts.
+  questionKey String
+  answerHash  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionKey])
+  @@index([userId])
+}
+
+/// An append-only record that a password was reset through the questions, kept
+/// apart from the notification so the history survives the notice being read.
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model Item {

@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
         contact: true,
         role: true,
         passwordHash: true,
+        sessionEpoch: true,
       },
     })
 
@@ -42,9 +43,10 @@ export async function POST(request: NextRequest) {
       name: user.name,
       email: user.email,
       role,
+      epoch: user.sessionEpoch,
     })
 
-    const { passwordHash: _passwordHash, ...safeUser } = user
+    const { passwordHash: _passwordHash, sessionEpoch: _sessionEpoch, ...safeUser } = user
 
     return attachSessionCookie(json({ user: { ...safeUser, role } }), token)
   })
