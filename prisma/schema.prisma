@@ -39,8 +39,15 @@ enum ClaimStatus {
   REJECTED
 }
 
+enum MatchStatus {
+  SUGGESTED
+  CONFIRMED
+  DISMISSED
+}
+
 enum NotificationType {
   POSSIBLE_MATCH
+  MATCH_CONFIRMED
   CLAIM_SUBMITTED
   CLAIM_APPROVED
   CLAIM_REJECTED
@@ -58,10 +65,11 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  items         Item[]         @relation("ItemReporter")
-  claims        Claim[]        @relation("Claimant")
-  decidedClaims Claim[]        @relation("ClaimDecision")
-  notifications Notification[]
+  items          Item[]         @relation("ItemReporter")
+  claims         Claim[]        @relation("Claimant")
+  decidedClaims  Claim[]        @relation("ClaimDecision")
+  decidedMatches Match[]        @relation("MatchDecision")
+  notifications  Notification[]
   releases      ReturnRecord[] @relation("ReleasedBy")
 }
 
@@ -79,6 +87,11 @@ model Item {
   /// CLIP ViT-L/14 embedding: 768 dimensions, L2 normalised.
   embedding         Unsupported("vector(768)")?
   status            ItemStatus @default(PENDING)
+  /// Who physically handed the item over at the OSAS counter. Null for a
+  /// student's own report; the admin intake flow records it so the chain of
+  /// custody survives even when the report is filed under a staff account.
+  finderName        String?
+  finderContact     String?
   reporterId        String
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
@@ -95,14 +108,20 @@ model Item {
 }
 
 model Match {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   lostItemId  String
   foundItemId String
   similarity  Float
-  createdAt   DateTime @default(now())
+  /// SUGGESTED until a person acts on the pair. Confirming or dismissing it is
+  /// the verification step behind "matching suggests, OSAS verifies".
+  status      MatchStatus @default(SUGGESTED)
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime    @default(now())
 
   lostItem  Item @relation("MatchLostItem", fields: [lostItemId], references: [id], onDelete: Cascade)
   foundItem Item @relation("MatchFoundItem", fields: [foundItemId], references: [id], onDelete: Cascade)
+  decidedBy User? @relation("MatchDecision", fields: [decidedById], references: [id], onDelete: SetNull)
 
   @@unique([lostItemId, foundItemId])
   @@index([lostItemId])
@@ -119,6 +138,9 @@ model Claim {
   additionalDetails String?
   /// Free-text proof of ownership supplied by the claimant.
   proof             String?
+  /// Optional photo the claimant attached as proof of ownership.
+  /// File name inside UPLOAD_DIR (never an absolute path).
+  proofImagePath    String?
   status            ClaimStatus @default(PENDING)
   decisionNote      String?
   decidedById       String?

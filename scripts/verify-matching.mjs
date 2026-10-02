@@ -4,17 +4,18 @@
  * Two people register through the public API, and the script proves both arrival
  * orders of a match:
  *
- *   Case 1 — a lost report first, then a found report of the same object: the
- *            lost owner is notified, the finder is not.
+ *   Case 1 — a lost report first, then a found report of the same object: both
+ *            owners are notified, each notice pointing at the other report.
  *   Case 2 — a found report first, then a lost report of the same object: the
- *            lost reporter gets the candidates on the report response *and* a
- *            stored notification, so the result outlives the confirmation screen.
+ *            later reporter gets the candidates on the report response *and* both
+ *            owners get a stored notification, so the result outlives the
+ *            confirmation screen.
  *
  * It then checks, through the API, that
  *
  *   1. a Match row exists and resolves from both reports,
- *   2. the lost side of the pair received a POSSIBLE_MATCH notification,
- *   3. the finder received none in either order,
+ *   2. both sides received a POSSIBLE_MATCH notification, and each notice
+ *      points at the other item of the pair,
  *   4. a report of a different object stays below the threshold (no false match),
  *
  * and it prints every similarity score it sees, so MATCH_THRESHOLD can be tuned
@@ -218,10 +219,10 @@ async function main() {
     `lost=${lostDetail.data?.item?.status} found=${foundDetail.data?.item?.status}`,
   )
 
-  section('The notification fired for the other side')
+  section('Both sides are notified')
   const notices = await request(lostReporter, '/api/notifications?unread=1')
   const matchNotice = (notices.data?.notifications ?? []).find(
-    (notice) => notice.type === 'POSSIBLE_MATCH' && notice.itemId === lostItem.id,
+    (notice) => notice.type === 'POSSIBLE_MATCH' && notice.itemId === foundItem.id,
   )
   check(
     'the lost reporter is notified about the possible match',
@@ -229,17 +230,23 @@ async function main() {
     matchNotice?.message?.slice(0, 90),
   )
   check(
+    "the notice points at the found report, not the lost reporter's own item",
+    matchNotice?.itemId === foundItem.id,
+    `itemId=${matchNotice?.itemId}`,
+  )
+  check(
     'the notification carries the match id, so "View Match" can open it',
     Boolean(matchNotice?.matchId) && matchNotice?.matchId === finderRow?.matchId,
     matchNotice ? `matchId=${matchNotice.matchId}` : undefined,
   )
   const finderNotices = await request(finder, '/api/notifications')
+  const finderNotice = (finderNotices.data?.notifications ?? []).find(
+    (notice) => notice.type === 'POSSIBLE_MATCH' && notice.itemId === lostItem.id,
+  )
   check(
-    'the finder is not notified, having already received the result inline',
-    (finderNotices.data?.notifications ?? []).filter(
-      (notice) => notice.type === 'POSSIBLE_MATCH',
-    ).length === 0,
-    `notifications=${(finderNotices.data?.notifications ?? []).length}`,
+    'the finder is notified too, and the notice points at the lost report',
+    Boolean(finderNotice) && finderNotice?.matchId === finderRow?.matchId,
+    finderNotice?.message?.slice(0, 90),
   )
 
   section('Case 2: a found item first, the lost report later')
@@ -295,7 +302,7 @@ async function main() {
   // The notice is what makes the candidates outlive the confirmation screen.
   const laterNotices = await request(lostReporter, '/api/notifications?unread=1')
   const laterNotice = (laterNotices.data?.notifications ?? []).find(
-    (notice) => notice.type === 'POSSIBLE_MATCH' && notice.itemId === lostLaterItem.id,
+    (notice) => notice.type === 'POSSIBLE_MATCH' && notice.itemId === foundFirstItem.id,
   )
   check(
     'the lost reporter is notified, so the result persists after the response',
@@ -303,8 +310,8 @@ async function main() {
     laterNotice?.message?.slice(0, 90),
   )
   check(
-    "the notice points at the reporter's own item and at the match row",
-    laterNotice?.itemId === lostLaterItem.id && laterNotice?.matchId === laterMatch?.matchId,
+    'the notice points at the other item and at the match row',
+    laterNotice?.itemId === foundFirstItem.id && laterNotice?.matchId === laterMatch?.matchId,
     `itemId=${laterNotice?.itemId} matchId=${laterNotice?.matchId}`,
   )
 
@@ -316,12 +323,14 @@ async function main() {
   )
 
   const finderAfterBoth = await request(finder, '/api/notifications')
+  const finderMatchNotices = (finderAfterBoth.data?.notifications ?? []).filter(
+    (notice) => notice.type === 'POSSIBLE_MATCH',
+  )
   check(
-    'the finder is not notified in either order',
-    (finderAfterBoth.data?.notifications ?? []).filter(
-      (notice) => notice.type === 'POSSIBLE_MATCH',
-    ).length === 0,
-    `notifications=${(finderAfterBoth.data?.notifications ?? []).length}`,
+    'the finder is notified in both orders, each notice pointing at the other report',
+    finderMatchNotices.some((notice) => notice.itemId === lostItem.id) &&
+      finderMatchNotices.some((notice) => notice.itemId === lostLaterItem.id),
+    `notices=${finderMatchNotices.length}`,
   )
 
   section('A different object must not match')
@@ -358,7 +367,7 @@ async function main() {
   )
   note(
     `case 2    : found reported first, lost report later — similarity ${laterSimilarity.toFixed(4)}, ` +
-      'notice written to the lost reporter.',
+      'notice written to both reporters, each pointing at the other item.',
   )
   note('  The sub-threshold score of every candidate is in the server log, e.g.:')
   note('  [match] FOUND "backpack found in the lobby" (cuid) vs 1 open LOST candidate(s), threshold=0.870')
