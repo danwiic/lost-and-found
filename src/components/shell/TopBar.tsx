@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { AccountMenu } from '@/components/shell/AccountMenu'
+import { homeFor } from '@/components/shell/nav-items'
 import { inputClass } from '@/components/ui/Field'
 import { Icon } from '@/components/ui/Icon'
 import type { SessionUser } from '@/lib/session'
@@ -14,7 +15,7 @@ export function TopBar({ user, unread }: { user: SessionUser; unread: number }) 
     <header className="sticky top-0 z-40 border-b border-line bg-canvas/85 backdrop-blur-sm">
       <div className="flex items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <Link
-          href="/"
+          href={homeFor(user.role)}
           className="shrink-0 text-base font-semibold tracking-tight text-ink lg:hidden"
         >
           Lost &amp; Found

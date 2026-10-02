@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { SignJWT, jwtVerify } from 'jose'
 import type { NextRequest, NextResponse } from 'next/server'
@@ -14,6 +15,8 @@ export type AuthedUser = {
   studentId: string | null
   contact: string | null
   role: UserRole
+  /** True while a staff-issued temporary password is still in force. */
+  mustChangePassword: boolean
 }
 
 const ALGORITHM = 'HS256'
@@ -40,6 +43,30 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, passwordHash: string): Promise<boolean> {
   return bcrypt.compare(password, passwordHash)
+}
+
+/**
+ * Unambiguous alphabet for a password that gets read aloud or written on paper
+ * at the counter: no 0/O, no 1/l/I. Lowercase and digits only, because mixed
+ * case is where a hand-off goes wrong.
+ */
+const TEMP_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'
+const TEMP_LENGTH = 10
+
+/**
+ * A one-time password for the OSAS counter. Generated from the CSPRNG — the
+ * whole value is the security, since it is shown once on screen and never
+ * stored in readable form. 10 characters over this alphabet is ~32 bits of
+ * entropy behind an admin-only, audited endpoint, and it only lives until the
+ * owner changes it at first sign-in.
+ */
+export function generateTemporaryPassword(): string {
+  const bytes = randomBytes(TEMP_LENGTH)
+  let password = ''
+  for (let index = 0; index < TEMP_LENGTH; index += 1) {
+    password += TEMP_ALPHABET[bytes[index] % TEMP_ALPHABET.length]
+  }
+  return password
 }
 
 export async function createSessionToken(user: {
@@ -120,6 +147,7 @@ export async function getSessionUser(request: NextRequest): Promise<AuthedUser |
       contact: true,
       role: true,
       sessionEpoch: true,
+      mustChangePassword: true,
     },
   })
   if (!user) return null
@@ -129,9 +157,21 @@ export async function getSessionUser(request: NextRequest): Promise<AuthedUser |
   return { ...authed, role: toRole(user.role) }
 }
 
-export async function requireUser(request: NextRequest): Promise<AuthedUser> {
+/**
+ * Resolves the signed-in user, refusing anyone holding a temporary password.
+ * Enforcement lives here rather than in each route so a new endpoint cannot
+ * forget it: while the flag is set, the only calls that answer are the ones
+ * that change the password, and they opt in explicitly.
+ */
+export async function requireUser(
+  request: NextRequest,
+  options: { allowTemporaryPassword?: boolean } = {},
+): Promise<AuthedUser> {
   const user = await getSessionUser(request)
   if (!user) throw unauthorized()
+  if (user.mustChangePassword && !options.allowTemporaryPassword) {
+    throw forbidden('Choose your own password before using anything else.')
+  }
   return user
 }
 

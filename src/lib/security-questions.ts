@@ -58,7 +58,7 @@ export function recoveryPrompt(key: string): string {
 
 /** The one message used whenever the questions are locked, so it stays true. */
 export function recoveryLockMessage(): string {
-  return `Too many wrong answers. Try again in ${RECOVERY_LOCK_MINUTES} minutes, or ask the OSAS office to reset your password.`
+  return `Too many wrong answers. Try again in ${RECOVERY_LOCK_MINUTES} minutes.`
 }
 
 /**

@@ -11,6 +11,8 @@ export type SessionUser = {
   studentId: string | null
   contact: string | null
   role: 'USER' | 'ADMIN'
+  /** True while a staff-issued temporary password is still in force. */
+  mustChangePassword: boolean
 }
 
 /**
@@ -34,6 +36,7 @@ export async function readSession(): Promise<SessionUser | null> {
       contact: true,
       role: true,
       sessionEpoch: true,
+      mustChangePassword: true,
     },
   })
   if (!user) return null

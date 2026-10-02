@@ -31,6 +31,8 @@ export const ADMIN_NAV: NavItem[] = [
   { href: '/admin/found', label: 'Found Items', icon: 'ledger' },
   { href: '/admin/claims', label: 'Claims', icon: 'claim' },
   { href: '/admin/returns', label: 'Returns', icon: 'check' },
+  // Last, because it is the rare errand: a student who cannot sign in.
+  { href: '/admin/accounts', label: 'Accounts', icon: 'user' },
 ]
 
 /**
@@ -52,6 +54,17 @@ export const ADMIN_MOBILE_NAV: NavItem[] = [
 /** OSAS staff keep their own navigation, separated from the student one. */
 export function navFor(role: 'USER' | 'ADMIN'): NavItem[] {
   return role === 'ADMIN' ? ADMIN_NAV : USER_NAV
+}
+
+/**
+ * Where an account belongs when nothing more specific was asked for: after
+ * signing in, or when tapping the wordmark. Staff land on the OSAS dashboard,
+ * not the student desk — the desk is still reachable, but it should never be
+ * the first thing an admin sees, because every control on it is the wrong one
+ * for their day. A `?next=` destination always wins over this.
+ */
+export function homeFor(role: 'USER' | 'ADMIN'): string {
+  return role === 'ADMIN' ? '/admin' : '/'
 }
 
 /**

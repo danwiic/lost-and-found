@@ -432,6 +432,51 @@ export async function saveRecoveryQuestions(input: {
   return data.questions ?? []
 }
 
+/**
+ * The signed-in user changes their own password. Also the way out of a
+ * staff-issued temporary password: the response re-issues this device's cookie,
+ * because the change signs every device out — including, briefly, this one.
+ */
+export async function changeOwnPassword(input: {
+  currentPassword: string
+  password: string
+  confirmPassword: string
+}): Promise<{ message: string }> {
+  const response = await fetch('/api/auth/password', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw await parseFailure(response)
+
+  const data = (await response.json()) as { message?: string }
+  return { message: data.message ?? 'Your password was changed.' }
+}
+
+/**
+ * OSAS issues a temporary password for an account at the counter. The value
+ * comes back once, to be shown on screen and handed over — it is never stored
+ * in a readable form and cannot be looked up again.
+ */
+export async function issueTemporaryPassword(userId: string): Promise<{
+  account: { id: string; name: string; email: string }
+  temporaryPassword: string
+  issuedBy: string
+}> {
+  const response = await fetch(`/api/admin/users/${userId}/password-reset`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+  if (!response.ok) throw await parseFailure(response)
+
+  return (await response.json()) as {
+    account: { id: string; name: string; email: string }
+    temporaryPassword: string
+    issuedBy: string
+  }
+}
+
 /** Puts the desk's setup prompt away. It returns after a fortnight. */
 export async function hideRecoveryPrompt(): Promise<void> {
   const response = await fetch('/api/auth/recovery', {

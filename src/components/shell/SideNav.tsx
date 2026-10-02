@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { activeNavHref, navFor } from '@/components/shell/nav-items'
+import { activeNavHref, homeFor, navFor } from '@/components/shell/nav-items'
 import { Icon } from '@/components/ui/Icon'
 
 export function SideNav({ role, unread }: { role: 'USER' | 'ADMIN'; unread: number }) {
@@ -16,7 +16,7 @@ export function SideNav({ role, unread }: { role: 'USER' | 'ADMIN'; unread: numb
       className="hidden border-r border-line bg-rail lg:sticky lg:top-0 lg:block lg:h-screen"
     >
       <div className="flex h-full flex-col gap-8 px-4 py-6">
-        <Link href="/" className="block rounded-lg px-3 py-1">
+        <Link href={homeFor(role)} className="block rounded-lg px-3 py-1">
           <span className="block text-base leading-tight font-semibold tracking-tight text-ink">
             Lost &amp; Found
           </span>
