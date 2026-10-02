@@ -369,3 +369,75 @@ export async function searchItemsByPhoto(file: File): Promise<PhotoSearchRespons
 
   return (await response.json()) as PhotoSearchResponse
 }
+
+/* -------------------------------------------------------------------------
+ * Account recovery
+ * ---------------------------------------------------------------------- */
+
+/** The prompt for one question, as the reset form shows it. */
+export type RecoveryQuestion = { questionKey: string; prompt: string }
+
+/**
+ * First step of a reset: the questions set up for an email address. An empty
+ * list means either no such account or no questions configured — the form
+ * cannot tell them apart, which is deliberate.
+ */
+export async function fetchRecoveryQuestions(email: string): Promise<RecoveryQuestion[]> {
+  const response = await fetch('/api/auth/recovery/questions', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  if (!response.ok) throw await parseFailure(response)
+
+  const data = (await response.json()) as { questions?: RecoveryQuestion[] }
+  return data.questions ?? []
+}
+
+/** Second step: verify the answers and set the new password. */
+export async function resetPasswordWithAnswers(input: {
+  email: string
+  answers: { questionKey: string; answer: string }[]
+  password: string
+  confirmPassword: string
+}): Promise<{ message: string }> {
+  const response = await fetch('/api/auth/recovery/reset', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) throw await parseFailure(response)
+
+  const data = (await response.json()) as { message?: string }
+  return { message: data.message ?? 'Your password was reset.' }
+}
+
+/**
+ * Sets or replaces the signed-in user's recovery questions. The current
+ * password is required: otherwise a stolen session could replace the questions
+ * and lock the owner out of the only route back in.
+ */
+export async function saveRecoveryQuestions(input: {
+  password: string
+  answers: { questionKey: string; answer: string }[]
+}): Promise<RecoveryQuestion[]> {
+  const response = await fetch('/api/auth/recovery', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'SET', ...input }),
+  })
+  if (!response.ok) throw await parseFailure(response)
+
+  const data = (await response.json()) as { questions?: RecoveryQuestion[] }
+  return data.questions ?? []
+}
+
+/** Puts the desk's setup prompt away. It returns after a fortnight. */
+export async function hideRecoveryPrompt(): Promise<void> {
+  const response = await fetch('/api/auth/recovery', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'HIDE_PROMPT' }),
+  })
+  if (!response.ok) throw await parseFailure(response)
+}
