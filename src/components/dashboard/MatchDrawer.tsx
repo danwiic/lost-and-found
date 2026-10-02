@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { buttonClass } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Drawer'
@@ -67,6 +68,8 @@ export function MatchDrawer({
 function MatchDrawerBody({ subject }: { subject: MatchSubject }) {
   const [state, setState] = useState<DrawerState>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
+  // Tuning mode: `?debug=1` adds the raw cosine behind each similarity score.
+  const debug = useSearchParams().get('debug') === '1'
 
   useEffect(() => {
     const controller = new AbortController()
@@ -138,15 +141,19 @@ function MatchDrawerBody({ subject }: { subject: MatchSubject }) {
                 ? '1 candidate item'
                 : `${state.data.matches.length} candidate items`}
             </h3>
-            {/* Measurement type: the threshold is a number to read exactly. */}
-            <p className="data text-xs text-ink-muted">
-              threshold {formatSimilarity(state.data.threshold)}
-            </p>
+            {/* The bar is the system's own setting: users read the percentage on
+                each card, not the threshold it had to clear. ?debug=1 shows it. */}
+            {debug ? (
+              <p className="data text-xs text-ink-muted">
+                threshold {formatSimilarity(state.data.threshold)} · baseline{' '}
+                {state.data.baseline.toFixed(2)}
+              </p>
+            ) : null}
           </div>
 
           <ul className="mt-3 space-y-4">
             {state.data.matches.map((match) => (
-              <CandidateCard key={match.matchId} match={match} subject={subject} />
+              <CandidateCard key={match.matchId} match={match} subject={subject} debug={debug} />
             ))}
           </ul>
         </section>
@@ -160,7 +167,15 @@ function MatchDrawerBody({ subject }: { subject: MatchSubject }) {
   )
 }
 
-function CandidateCard({ match, subject }: { match: MatchCandidate; subject: MatchSubject }) {
+function CandidateCard({
+  match,
+  subject,
+  debug,
+}: {
+  match: MatchCandidate
+  subject: MatchSubject
+  debug: boolean
+}) {
   return (
     <li className="overflow-hidden rounded-lg border border-line bg-surface">
       <div className="grid grid-cols-2 gap-3 p-4">
@@ -180,6 +195,11 @@ function CandidateCard({ match, subject }: { match: MatchCandidate; subject: Mat
           <Icon name="compare" className="h-4 w-4" />
         </span>
         <p className="text-xs font-medium text-ink-muted">Visual similarity</p>
+        {debug ? (
+          <p className="data text-xs text-ink-muted">
+            raw {match.raw.toFixed(4)} · calibrated {match.similarity.toFixed(4)}
+          </p>
+        ) : null}
         <p className="data reading-in ml-auto text-lg leading-none text-attention">
           {formatSimilarity(match.similarity)}
         </p>

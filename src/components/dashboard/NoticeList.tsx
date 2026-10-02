@@ -1,8 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { MatchDrawer, type MatchSubject } from '@/components/dashboard/MatchDrawer'
 import { buttonClass, Spinner } from '@/components/ui/Button'
 import { EmptyState, ErrorNote } from '@/components/ui/EmptyState'
 import { Icon } from '@/components/ui/Icon'
@@ -16,6 +16,8 @@ import { formatRelative } from '@/lib/format'
 
 const HEADINGS: Record<string, string> = {
   POSSIBLE_MATCH: 'Possible match found',
+  MATCH_CONFIRMED: 'Match confirmed',
+  PASSWORD_RESET: 'Password reset',
   CLAIM_SUBMITTED: 'Claim submitted',
   CLAIM_APPROVED: 'Claim approved',
   CLAIM_REJECTED: 'Claim rejected',
@@ -26,6 +28,10 @@ const HEADINGS: Record<string, string> = {
  * Notices as a ledger. Opening one marks it read (agents/UX.md §8.1); a notice
  * that has somewhere to go offers that action, and one that is informational
  * only offers "Mark as read" rather than a button that leads nowhere (§8.2).
+ *
+ * A match notice carries the OTHER item of the pair (see lib/match.ts), so the
+ * row previews the item that matched — not the report the reader already knows
+ * about — and the action opens that item's page.
  */
 export function NoticeList({
   notices,
@@ -39,8 +45,6 @@ export function NoticeList({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [markingAll, setMarkingAll] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
-  const [subject, setSubject] = useState<MatchSubject | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const unreadCount = notices.filter((notice) => !notice.read).length
   const mixed = unreadCount < notices.length
@@ -57,20 +61,6 @@ export function NoticeList({
     } finally {
       setBusyId(null)
     }
-  }
-
-  async function openMatch(notice: NoticeRow) {
-    if (!notice.item) return
-    setSubject({
-      id: notice.item.id,
-      name: notice.item.name,
-      type: notice.item.type,
-      status: notice.item.status,
-      photoUrl: notice.item.photoUrl,
-    })
-    setDrawerOpen(true)
-    // Viewing the match counts as opening the notice.
-    if (!notice.read) await markRead(notice.id, { silent: true })
   }
 
   async function markAll() {
@@ -121,7 +111,14 @@ export function NoticeList({
       <LedgerList>
         {notices.map((notice) => {
           const unread = !notice.read
-          const canViewMatch = notice.type === 'POSSIBLE_MATCH' && Boolean(notice.item)
+          // A confirmed match still points at the counterpart item, but the
+          // action it exists for is the claim: send the reader straight to the
+          // claim form. If the item is no longer claimable the claim page
+          // redirects back to the item, so the direct link is safe.
+          const isMatch =
+            notice.type === 'POSSIBLE_MATCH' || notice.type === 'MATCH_CONFIRMED'
+          const isConfirmed = notice.type === 'MATCH_CONFIRMED'
+          const canViewMatch = isMatch && Boolean(notice.itemId)
 
           return (
             <li key={notice.id} className={unread ? 'bg-accent-soft/60' : undefined}>
@@ -149,21 +146,29 @@ export function NoticeList({
                   <p className="measure mt-1 text-sm text-ink-muted">{notice.message}</p>
 
                   {notice.item ? (
-                    <p className="mt-2 text-xs text-ink-muted">Record: {notice.item.name}</p>
+                    <p className="mt-2 text-xs text-ink-muted">
+                      {isMatch ? 'Matched item' : 'Record'}: {notice.item.name}
+                    </p>
                   ) : null}
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {canViewMatch ? (
-                      <button
-                        type="button"
-                        onClick={() => void openMatch(notice)}
-                        disabled={busyId === notice.id}
+                      <Link
+                        href={
+                          isConfirmed
+                            ? `/items/${notice.itemId}/claim`
+                            : `/items/${notice.itemId}`
+                        }
+                        onClick={() => {
+                          // Opening the notice is what clears it. The PATCH is
+                          // kept alive across the navigation by the client API.
+                          if (unread) void markRead(notice.id, { silent: true })
+                        }}
                         className={buttonClass({ variant: 'secondary', size: 'sm' })}
                       >
-                        {busyId === notice.id ? <Spinner /> : null}
-                        View Match
+                        {isConfirmed ? 'File a Claim' : 'View Matched Item'}
                         <Icon name="arrow" className="h-4 w-4" />
-                      </button>
+                      </Link>
                     ) : unread ? (
                       <button
                         type="button"
@@ -182,15 +187,6 @@ export function NoticeList({
           )
         })}
       </LedgerList>
-
-      <MatchDrawer
-        open={drawerOpen}
-        subject={subject}
-        onClose={() => {
-          setDrawerOpen(false)
-          setSubject(null)
-        }}
-      />
     </>
   )
 }
