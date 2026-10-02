@@ -16,6 +16,9 @@ export const metadata: Metadata = { title: 'Claims — OSAS' }
 const FILTERS = [
   { value: '', label: 'All claims' },
   { value: 'PENDING', label: 'Pending' },
+  // Not a claim status: approved with no return recorded yet. It is the only
+  // view that needs someone to walk to the shelf, so it sits beside the others.
+  { value: 'AWAITING_RELEASE', label: 'Awaiting release' },
   { value: 'APPROVED', label: 'Approved' },
   { value: 'REJECTED', label: 'Rejected' },
 ]
@@ -52,6 +55,7 @@ export default async function AdminClaimsPage({
 
   const { claims, total, pageCount } = await loadAdminClaims({ status, page })
   const counts = await loadClaimCounts()
+  const awaiting = status === 'AWAITING_RELEASE'
 
   return (
     <div className="page-stack">
@@ -71,6 +75,7 @@ export default async function AdminClaimsPage({
               { label: 'Matching this view', value: total },
               { label: 'Pending overall', value: counts.pending, emphasis: counts.pending > 0 },
               { label: 'Approved', value: counts.approved },
+              { label: 'Awaiting release', value: counts.awaitingRelease, emphasis: counts.awaitingRelease > 0 },
               { label: 'Rejected', value: counts.rejected },
             ]}
           />
@@ -100,11 +105,19 @@ export default async function AdminClaimsPage({
       <Panel>
         {claims.length === 0 ? (
           <EmptyState
-            title={status ? 'No claims with that status.' : 'No claims have been filed yet.'}
+            title={
+              awaiting
+                ? 'Nothing is waiting to be collected.'
+                : status
+                  ? 'No claims with that status.'
+                  : 'No claims have been filed yet.'
+            }
             message={
-              status
-                ? 'Nothing in this view right now. Claims move here as OSAS decides them.'
-                : 'When a student submits a claim on an item, it arrives here for verification.'
+              awaiting
+                ? 'Every approved claim has had its hand-over recorded. Items still on the shelf appear here the moment a claim is approved.'
+                : status
+                  ? 'Nothing in this view right now. Claims move here as OSAS decides them.'
+                  : 'When a student submits a claim on an item, it arrives here for verification.'
             }
           >
             {status ? (
@@ -139,6 +152,16 @@ export default async function AdminClaimsPage({
                       <Badge tone={claimStatusTone(claim.status)}>
                         {claimStatusLabel(claim.status)}
                       </Badge>
+                      {/* Approved is two different situations: on the shelf, or
+                          gone. Only the row's own state can tell them apart. */}
+                      {claim.awaitingRelease ? (
+                        <Badge tone="attention">On the shelf — not released</Badge>
+                      ) : null}
+                      {claim.returnRecord ? (
+                        <p className="text-xs text-ink-muted">
+                          Released {formatRelative(claim.returnRecord.returnDate)}
+                        </p>
+                      ) : null}
                       {claim.decidedByName ? (
                         <p className="text-xs text-ink-muted">Decided by {claim.decidedByName}</p>
                       ) : null}

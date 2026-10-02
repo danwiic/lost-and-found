@@ -38,7 +38,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <MobileNav unread={unread} />
+      <MobileNav role={user.role} unread={unread} />
     </ToastProvider>
   )
 }

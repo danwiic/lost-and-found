@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ClaimDecision } from '@/components/admin/ClaimDecision'
+import { ProofPhoto } from '@/components/admin/ProofPhoto'
 import { RecordReturn } from '@/components/admin/RecordReturn'
 import { Badge } from '@/components/ui/Badge'
 import { buttonClass } from '@/components/ui/Button'
@@ -14,6 +15,7 @@ import {
   claimStatusMeaning,
   claimStatusTone,
   formatDate,
+  formatSimilarity,
   formatRelative,
   itemStatusLabel,
   itemStatusTone,
@@ -152,6 +154,20 @@ export default async function AdminClaimPage({
               <p className="measure mt-2 text-sm whitespace-pre-line text-ink">
                 {claim.proof ?? 'No proof of ownership was recorded with this claim.'}
               </p>
+
+              {/* Small on the desk so the page stays scannable; clicking opens
+                  the photo large enough to examine. */}
+              {claim.proofPhotoUrl ? (
+                <div className="mt-4">
+                  <ProofPhoto
+                    src={claim.proofPhotoUrl}
+                    claimantName={claim.claimantName}
+                    itemName={claim.item.name}
+                  />
+                </div>
+              ) : claim.proof ? (
+                <p className="mt-4 text-xs text-ink-muted">No photo was attached to this claim.</p>
+              ) : null}
             </div>
 
             {claim.decidedAt ? (
@@ -172,6 +188,100 @@ export default async function AdminClaimPage({
           </div>
         </Panel>
       </div>
+
+      {/* What else is attached to this item. A claim is decided against the
+          whole picture: another claimant may be waiting, and the item may carry
+          candidate matches that bear on who it belongs to. */}
+      {claim.otherClaims.length > 0 || claim.matches.length > 0 ? (
+        <div className="grid gap-8 lg:grid-cols-2">
+          <Panel>
+            <PanelHeading
+              title="Other claims on this item"
+              description="Approving one claim rejects the others and notifies everyone."
+            />
+            {claim.otherClaims.length === 0 ? (
+              <div className="px-6 py-6 sm:px-6">
+                <p className="text-sm text-ink-muted">
+                  No one else has claimed this item. This is the only claim on record.
+                </p>
+              </div>
+            ) : (
+              <LedgerList>
+                {claim.otherClaims.map((other) => (
+                  <li key={other.id} className="relative">
+                    <div className="px-6 py-4 sm:px-6">
+                      <h3 className="text-[0.9375rem] leading-snug font-medium">
+                        <Link
+                          href={`/admin/claims/${other.id}`}
+                          className="rounded-lg after:absolute after:inset-0 hover:underline"
+                        >
+                          {other.claimantName}
+                        </Link>
+                      </h3>
+                      <p className="mt-1 text-xs text-ink-muted">
+                        {other.studentId ? `${other.studentId} · ` : ''}filed{' '}
+                        {formatRelative(other.createdAt)}
+                      </p>
+                      <Badge tone={claimStatusTone(other.status)} className="mt-3">
+                        {claimStatusLabel(other.status)}
+                      </Badge>
+                    </div>
+                  </li>
+                ))}
+              </LedgerList>
+            )}
+          </Panel>
+
+          <Panel>
+            <PanelHeading
+              title="Candidate matches"
+              description="Visual leads only — similarity never proves ownership."
+            />
+            {claim.matches.length === 0 ? (
+              <div className="px-6 py-6 sm:px-6">
+                <p className="text-sm text-ink-muted">
+                  No other item&apos;s photograph resembles this one closely enough to suggest a
+                  match.
+                </p>
+              </div>
+            ) : (
+              <LedgerList>
+                {claim.matches.map((match) => (
+                  <li key={match.matchId} className="relative">
+                    <div className="flex items-start gap-4 px-6 py-4 sm:px-6">
+                      <PhotoFrame
+                        src={match.imagePath ? `/api/files/${match.imagePath}` : null}
+                        alt={match.name}
+                        size="thumb"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-[0.9375rem] leading-snug font-medium">
+                          <Link
+                            href={`/items/${match.itemId}`}
+                            className="rounded-lg after:absolute after:inset-0 hover:underline"
+                          >
+                            {match.name}
+                          </Link>
+                        </h3>
+                        <p className="mt-1 text-xs text-ink-muted">
+                          {itemTypeLabel(match.type)} · {match.location} · reported by{' '}
+                          {match.reporterName}
+                        </p>
+                        <p className="mt-2 text-xs text-ink-muted">
+                          Visual similarity{' '}
+                          <span className="nums font-medium text-attention">
+                            {formatSimilarity(match.similarity)}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </LedgerList>
+            )}
+          </Panel>
+        </div>
+      ) : null}
 
       {open ? (
         <Panel>

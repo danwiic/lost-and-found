@@ -20,27 +20,36 @@ export default async function HomePage() {
     data.notices.filter((notice: NoticeRow) => notice.type === type).length
 
   const matchesWaiting = countOf('POSSIBLE_MATCH')
+  const confirmedWaiting = countOf('MATCH_CONFIRMED')
   const approvedWaiting = countOf('CLAIM_APPROVED')
 
+  // A confirmed match outranks an unconfirmed one: OSAS has already looked, and
+  // the next step belongs to the owner — file the claim.
   const headline =
-    matchesWaiting > 0
-      ? matchesWaiting === 1
-        ? 'One possible match to review'
-        : `${matchesWaiting} possible matches to review`
-      : approvedWaiting > 0
-        ? 'Your claim was approved'
-        : data.tallies.unread > 0
-          ? data.tallies.unread === 1
-            ? 'One unread notice'
-            : `${data.tallies.unread} unread notices`
-          : 'Nothing is waiting on you'
+    confirmedWaiting > 0
+      ? confirmedWaiting === 1
+        ? 'OSAS confirmed a match — file a claim'
+        : `${confirmedWaiting} confirmed matches — file your claims`
+      : matchesWaiting > 0
+        ? matchesWaiting === 1
+          ? 'One possible match to review'
+          : `${matchesWaiting} possible matches to review`
+        : approvedWaiting > 0
+          ? 'Your claim was approved'
+          : data.tallies.unread > 0
+            ? data.tallies.unread === 1
+              ? 'One unread notice'
+              : `${data.tallies.unread} unread notices`
+            : 'Nothing is waiting on you'
 
   const situation =
-    matchesWaiting > 0
-      ? 'The matching system found items that look like something you reported. Similarity is a lead, not proof — open the photos and claim only what is yours.'
-      : approvedWaiting > 0
-        ? 'OSAS verified your claim. Bring your student ID to the OSAS office to collect the item; the return is recorded when it is released.'
-        : 'Report what you lost, or what you found and turned in. A new report is compared against open items of the opposite type as soon as its photo arrives.'
+    confirmedWaiting > 0
+      ? 'OSAS checked the resemblance and confirmed the two records are the same item. Ownership is still proved through a claim — file it with what only the owner would know.'
+      : matchesWaiting > 0
+        ? 'The matching system found items that look like something you reported. Similarity is a lead, not proof — open the photos and claim only what is yours.'
+        : approvedWaiting > 0
+          ? 'OSAS verified your claim. Bring your student ID to the OSAS office to collect the item; the return is recorded when it is released.'
+          : 'Report what you lost, or what you found and turned in. A new report is compared against open items of the opposite type as soon as its photo arrives.'
 
   return (
     <div className="page-stack">
