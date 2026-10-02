@@ -24,6 +24,10 @@ Students register themselves, and every item in the system comes from a real rep
 ### Students
 
 - **Register / sign in / sign out.** Registration signs the new account straight in.
+- **Password & recovery.** Change your password from the profile. Forgot it? Set security
+  questions there (a dashboard prompt reminds you), then reset it from the *Forgot your
+  password?* link on the sign-in page by answering them — no email is sent. A staff-issued
+  temporary password must be replaced at the next sign-in.
 - **Dashboard.** Tallies of your reports and claims, the unread notice queue, and shortcuts to
   both report forms.
 - **Report a lost or found item.** Name, description, colour, date, location, photo (required —
@@ -56,6 +60,12 @@ Students register themselves, and every item in the system comes from a real rep
   date (bounded to after the claim was filed, never in the future), notes, and the staff member
   recording it. Only a return record marks an item **Returned**.
 - **Returns register.** Every item released, newest first, with claimant and recorder.
+- **Counter intake.** Log an item handed in at the office, recording who found it — the
+  found-item form completed on the office's behalf, running through the same match-and-notify
+  pipeline as any other report.
+- **Account desk.** Find a student by name, email or student ID and issue a temporary password
+  when they cannot sign in; the account stays flagged until they replace it at next sign-in.
+  Staff accounts cannot be reset from this screen.
 
 ---
 
@@ -172,6 +182,27 @@ npm run dev                  # http://localhost:3000
 > `localhost` can resolve to IPv6 first and produce intermittent `P1017` connection errors.
 > If port 3000 is taken, run `npm run dev -- -p 3100`.
 
+### Resetting for a demo
+
+```bash
+npm run demo:reset                   # clear reports, matches, claims, returns and notices
+npm run demo:reset -- --dry-run      # list what would go, change nothing
+```
+
+The reset empties every report and everything hanging off it — matches, claims, return records
+and notifications — plus the stored photos, while leaving **every account untouched**: sign-ins,
+security questions and password-reset history all survive, so the desk can be cleared without
+re-registering anyone. It never runs on its own; it is a deliberate, one-way action.
+
+Inside the Compose stack the database has no published host port, so run it in the app
+container:
+
+```bash
+docker compose exec app node scripts/clear-demo-data.mjs
+```
+
+Add `--keep-photos` or `--keep-notifications` to leave either in place.
+
 ---
 
 ## Verification
@@ -182,6 +213,7 @@ npm run lint                 # eslint 9, flat config
 npm run build                # production build
 npm run audit:contrast       # every text token pair vs WCAG AA
 npm run audit:spacing        # every spacing utility vs the 4·8·12·16·24·32·48 scale
+npm run audit:headers        # every page title through PageHeader; descriptions stay one line
 npm run check:render         # drives the real UI journeys over HTTP
 ```
 
@@ -263,10 +295,10 @@ to signed-in users; dates cannot be in the future and a return cannot precede it
 │   ├── main.py                # FastAPI: /embed, /health (+ /docs behind compose.docs.yml)
 │   ├── Dockerfile             # model baked at build, pinned HF revision
 │   └── model-cache/clip-ViT-L-14/   # keep on disk — part of the build context
-├── scripts/                   # verification suites (see "Verification" above)
+├── scripts/                   # verification suites, audits, and the demo reset
 ├── src/
 │   ├── app/
-│   │   ├── (auth)/            # /login, /register
+│   │   ├── (auth)/            # /login, /register, /forgot-password, /change-password
 │   │   ├── (app)/             # dashboard, browse, reports, claims, notifications,
 │   │   │                      # profile, items, and the /admin/** surfaces
 │   │   └── api/               # auth, items (+ photo-search), claims (+ return),
@@ -304,21 +336,6 @@ MATCHING_LAB_DIR=/app/matching-lab # optional: where the matching lab appends it
 
 Inside Compose the app container gets its values from `docker-compose.yml`; tuning the
 threshold is a one-line change plus a restart.
-
-## Common issues
-
-- **Login appears to succeed but everything is 401.** `COOKIE_SECURE=1` over plain
-  `http://localhost` makes the browser drop the session cookie. Keep it `0` locally.
-- **The app refuses to start with the placeholder secret.** `AUTH_SECRET` must be set to a real
-  value in `.env`.
-- **First match/search is slow.** The embedder loads the model at boot (~2 s per embedding once
-  warm; the app waits for its healthcheck). Open the app once before presenting.
-- **Intermittent `P1017` connection errors in host dev mode.** Use `127.0.0.1` instead of
-  `localhost` in `DATABASE_URL` (IPv6 resolution order).
-- **Embedder image build fails on another machine.** `embedder/model-cache/` must be present —
-  it is copied into the image at build time and is deliberately not downloaded at runtime.
-- **`prisma migrate reset` does not seed** under Prisma 7. Follow it with `npm run db:seed`.
-- **Photos disappear after recreating containers.** The `uploads` volume must stay mounted.
 
 ## Scope
 
