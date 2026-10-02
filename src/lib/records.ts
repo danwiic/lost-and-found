@@ -1,4 +1,4 @@
-import { ClaimStatus, ItemStatus } from '@/generated/prisma/enums'
+import { ClaimStatus, ItemStatus, MatchStatus } from '@/generated/prisma/enums'
 import { prisma } from '@/lib/db'
 import { listMatchesForItem, type MatchCandidate } from '@/lib/match'
 import type { SessionUser } from '@/lib/session'
@@ -516,9 +516,13 @@ export type AdminTotals = {
   totalLostItems: number
   totalFoundItems: number
   pendingClaims: number
+  /** Suggested pairs still waiting on a confirm/dismiss decision. */
   possibleMatches: number
-  returnedItems: number
   openItems: number
+  /** Approved claims whose item is still physically on the shelf. */
+  awaitingRelease: number
+  /** Hand-overs recorded — the return history, independent of item status. */
+  returnRecords: number
 }
 
 export async function loadAdminOverview(viewer: Viewer): Promise<{
@@ -526,16 +530,28 @@ export async function loadAdminOverview(viewer: Viewer): Promise<{
   recentItems: RecordRow[]
   recentClaims: ClaimListRow[]
 }> {
-  const [totalLost, totalFound, pendingClaims, possibleMatches, returnedItems, openItems, recentItems, recentClaims] =
-    await Promise.all([
+  const [
+    totalLost,
+    totalFound,
+    pendingClaims,
+    possibleMatches,
+    openItems,
+    awaitingRelease,
+    returnRecords,
+    recentItems,
+    recentClaims,
+  ] = await Promise.all([
       prisma.item.count({ where: { type: 'LOST' } }),
       prisma.item.count({ where: { type: 'FOUND' } }),
       prisma.claim.count({ where: { status: 'PENDING' } }),
-      prisma.match.count(),
-      prisma.item.count({ where: { status: 'RETURNED' } }),
+      // Only pairs nobody has acted on are still candidates; confirming or
+      // dismissing one takes it out of the count.
+      prisma.match.count({ where: { status: MatchStatus.SUGGESTED } }),
       prisma.item.count({
         where: { status: { in: ['PENDING', 'POSSIBLE_MATCH', 'CLAIM_PENDING'] } },
       }),
+      prisma.claim.count({ where: { status: ClaimStatus.APPROVED, returns: { none: {} } } }),
+      prisma.returnRecord.count(),
       prisma.item.findMany({ orderBy: { createdAt: 'desc' }, take: 6, select: RECORD_SELECT }),
       prisma.claim.findMany({
         where: { status: 'PENDING' },
@@ -546,9 +562,101 @@ export async function loadAdminOverview(viewer: Viewer): Promise<{
     ])
 
   return {
-    totals: { totalLostItems: totalLost, totalFoundItems: totalFound, pendingClaims, possibleMatches, returnedItems, openItems },
+    totals: {
+      totalLostItems: totalLost,
+      totalFoundItems: totalFound,
+      pendingClaims,
+      possibleMatches,
+      openItems,
+      awaitingRelease,
+      returnRecords,
+    },
     recentItems: recentItems.map((item) => toRecord(item, viewer)),
     recentClaims: recentClaims.map(toClaimRow),
+  }
+}
+
+export type MatchPairSide = {
+  id: string
+  name: string
+  type: 'LOST' | 'FOUND'
+  status: string
+  photoUrl: string | null
+  location: string
+}
+
+export type MatchPairRow = {
+  id: string
+  similarity: number
+  createdAt: string
+  lostItem: MatchPairSide
+  foundItem: MatchPairSide
+}
+
+/**
+ * Suggested pairs still waiting on a person. "Matching suggests, OSAS verifies"
+ * has no meaning until someone can confirm or dismiss a pair, and this is that
+ * queue.
+ */
+export async function loadAdminMatchPairs(
+  limit = 6,
+): Promise<{ pairs: MatchPairRow[]; total: number }> {
+  const where = { status: MatchStatus.SUGGESTED }
+
+  const [total, rows] = await Promise.all([
+    prisma.match.count({ where }),
+    prisma.match.findMany({
+      where,
+      // Oldest first, like the claims queue: a suggestion nobody has looked at
+      // should not get fresher while it waits.
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+      select: {
+        id: true,
+        similarity: true,
+        createdAt: true,
+        lostItem: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            status: true,
+            imagePath: true,
+            location: true,
+          },
+        },
+        foundItem: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            status: true,
+            imagePath: true,
+            location: true,
+          },
+        },
+      },
+    }),
+  ])
+
+  const side = (item: (typeof rows)[number]['lostItem']): MatchPairSide => ({
+    id: item.id,
+    name: item.name,
+    type: item.type as 'LOST' | 'FOUND',
+    status: item.status,
+    photoUrl: photoUrl(item.imagePath),
+    location: item.location,
+  })
+
+  return {
+    total,
+    pairs: rows.map((row) => ({
+      id: row.id,
+      similarity: row.similarity,
+      createdAt: row.createdAt.toISOString(),
+      lostItem: side(row.lostItem),
+      foundItem: side(row.foundItem),
+    })),
   }
 }
 

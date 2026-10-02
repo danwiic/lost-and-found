@@ -244,6 +244,25 @@ export async function decideClaim(
   return { message: data.message ?? 'Decision recorded.' }
 }
 
+/**
+ * OSAS confirms a suggested pair as the same item, or dismisses it as a
+ * coincidence. Only a SUGGESTED pair can be decided.
+ */
+export async function decideMatch(
+  matchId: string,
+  action: 'CONFIRM' | 'DISMISS',
+): Promise<{ message: string }> {
+  const response = await fetch(`/api/matches/${matchId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action }),
+  })
+  if (!response.ok) throw await parseFailure(response)
+
+  const data = (await response.json()) as { message?: string }
+  return { message: data.message ?? 'Decision recorded.' }
+}
+
 /** Records the physical hand-over. A separate step from approving a claim. */
 export async function recordReturn(
   claimId: string,

@@ -47,8 +47,10 @@ export async function createSessionToken(user: {
   name: string
   email: string
   role: UserRole
+  /** The user's session epoch at issue time; a reset makes it stale. */
+  epoch: number
 }): Promise<string> {
-  return new SignJWT({ name: user.name, email: user.email, role: user.role })
+  return new SignJWT({ name: user.name, email: user.email, role: user.role, epoch: user.epoch })
     .setProtectedHeader({ alg: ALGORITHM })
     .setSubject(user.id)
     .setIssuedAt()
@@ -59,12 +61,19 @@ export async function createSessionToken(user: {
 export async function readSessionToken(token: string | undefined): Promise<{
   id: string
   role: UserRole
+  epoch: number
 } | null> {
   if (!token) return null
   try {
     const { payload } = await jwtVerify(token, secretKey(), { algorithms: [ALGORITHM] })
     if (typeof payload.sub !== 'string' || !payload.sub) return null
-    return { id: payload.sub, role: toRole(payload.role) }
+    return {
+      id: payload.sub,
+      role: toRole(payload.role),
+      // Tokens signed before session epochs existed carry no claim; the column
+      // default is 0, so they stay valid until the user resets a password.
+      epoch: typeof payload.epoch === 'number' ? payload.epoch : 0,
+    }
   } catch {
     // Expired, tampered with or signed with another secret.
     return null
@@ -98,14 +107,26 @@ export async function getSessionUser(request: NextRequest): Promise<AuthedUser |
   const session = await readSessionToken(token)
   if (!session) return null
 
-  // Load the row so role changes and deletions take effect immediately.
+  // Load the row so role changes, deletions and password resets take effect
+  // immediately: a reset bumps sessionEpoch, which makes every token signed
+  // before it fail the check below.
   const user = await prisma.user.findUnique({
     where: { id: session.id },
-    select: { id: true, name: true, email: true, studentId: true, contact: true, role: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      studentId: true,
+      contact: true,
+      role: true,
+      sessionEpoch: true,
+    },
   })
   if (!user) return null
+  if (user.sessionEpoch !== session.epoch) return null
 
-  return { ...user, role: toRole(user.role) }
+  const { sessionEpoch: _sessionEpoch, ...authed } = user
+  return { ...authed, role: toRole(user.role) }
 }
 
 export async function requireUser(request: NextRequest): Promise<AuthedUser> {

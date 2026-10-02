@@ -26,11 +26,22 @@ export async function readSession(): Promise<SessionUser | null> {
 
   const user = await prisma.user.findUnique({
     where: { id: session.id },
-    select: { id: true, name: true, email: true, studentId: true, contact: true, role: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      studentId: true,
+      contact: true,
+      role: true,
+      sessionEpoch: true,
+    },
   })
   if (!user) return null
+  // A password reset bumps the epoch; cookies signed before it stop resolving.
+  if (user.sessionEpoch !== session.epoch) return null
 
-  return { ...user, role: user.role === 'ADMIN' ? 'ADMIN' : 'USER' }
+  const { sessionEpoch: _sessionEpoch, ...rest } = user
+  return { ...rest, role: user.role === 'ADMIN' ? 'ADMIN' : 'USER' }
 }
 
 /** Every protected surface calls this; unauthenticated visitors go to sign in. */
