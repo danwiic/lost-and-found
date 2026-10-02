@@ -144,7 +144,7 @@ export function ForgotPasswordForm() {
     return (
       <EmptyState
         title="No recovery questions on that account"
-        message="Either there is no account with that email, or it has no security questions set up. Contact the OSAS office with your student ID — staff can reset your password in person."
+        message="Either there is no account with that email, or it has no security questions set up. A password can only be reset here with the questions, so check the address and try again."
       >
         <button
           type="button"

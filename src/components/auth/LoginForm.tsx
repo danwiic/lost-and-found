@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
 import { PasswordInput } from '@/components/auth/PasswordInput'
+import { homeFor } from '@/components/shell/nav-items'
 import { buttonClass, Spinner } from '@/components/ui/Button'
 import { ErrorNote } from '@/components/ui/EmptyState'
 import { Field, inputClass } from '@/components/ui/Field'
@@ -80,8 +81,24 @@ export function LoginForm() {
         return
       }
 
-      // Keep the button in its loading state while the dashboard loads.
-      router.push(returnTo)
+      // The role decides where a plain sign-in lands: staff belong on the OSAS
+      // dashboard, and sending them to the student desk first is the confusion
+      // this avoids. An explicit `?next=` always wins — that is a destination
+      // someone was already trying to reach.
+      const data = (await response.json().catch(() => null)) as {
+        user?: { role?: string; mustChangePassword?: boolean }
+      } | null
+      const landing =
+        returnTo !== '/'
+          ? returnTo
+          : // A temporary password from the counter has one destination: the
+            // screen that replaces it.
+            data?.user?.mustChangePassword
+            ? '/change-password'
+            : homeFor(data?.user?.role === 'ADMIN' ? 'ADMIN' : 'USER')
+
+      // Keep the button in its loading state while the destination loads.
+      router.push(landing)
       router.refresh()
     } catch {
       setFormError("We couldn't reach the server. Check your connection and try again.")
