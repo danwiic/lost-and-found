@@ -55,14 +55,23 @@ export type DashboardData = {
   notices: NoticeRow[]
   records: RecordRow[]
   claims: ClaimRow[]
+  /**
+   * Whether the desk should ask this account to set up recovery questions. A
+   * dismissal is honoured for a fortnight, then the ask returns once: silence
+   * should not be permanent, but a "not now" should not be a nag either.
+   */
+  showRecoveryPrompt: boolean
 }
 
 function photoUrl(imagePath: string | null): string | null {
   return imagePath ? `/api/files/${imagePath}` : null
 }
 
+/** How long a dismissed recovery prompt stays away. */
+const RECOVERY_PROMPT_SNOOZE_DAYS = 14
+
 export async function loadDashboard(user: SessionUser): Promise<DashboardData> {
-  const [lost, found, claims, unread, possibleMatches, notices, items, myClaims] =
+  const [lost, found, claims, unread, possibleMatches, notices, items, myClaims, recovery] =
     await Promise.all([
       prisma.item.count({ where: { reporterId: user.id, type: 'LOST' } }),
       prisma.item.count({ where: { reporterId: user.id, type: 'FOUND' } }),
@@ -88,6 +97,13 @@ export async function loadDashboard(user: SessionUser): Promise<DashboardData> {
           item: { select: { id: true, name: true, type: true, status: true, imagePath: true } },
         },
       }),
+      prisma.user.findUnique({
+        where: { id: user.id },
+        select: {
+          recoveryPromptHiddenAt: true,
+          _count: { select: { securityAnswers: true } },
+        },
+      }),
     ])
 
   // Notices carry an itemId; resolve those items in one query so each row can
@@ -102,8 +118,15 @@ export async function loadDashboard(user: SessionUser): Promise<DashboardData> {
       : []
   const itemById = new Map(noticeItems.map((item) => [item.id, item]))
 
+  const snoozedUntil = recovery?.recoveryPromptHiddenAt
+    ? recovery.recoveryPromptHiddenAt.getTime() + RECOVERY_PROMPT_SNOOZE_DAYS * 86_400_000
+    : 0
+  const showRecoveryPrompt =
+    (recovery?._count.securityAnswers ?? 0) === 0 && Date.now() >= snoozedUntil
+
   return {
     user,
+    showRecoveryPrompt,
     tallies: { lost, found, claims, unread, possibleMatches },
     notices: notices.map((notice) => {
       const item = notice.itemId ? itemById.get(notice.itemId) : undefined

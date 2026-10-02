@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 export type NotificationType =
   | 'POSSIBLE_MATCH'
   | 'MATCH_CONFIRMED'
+  | 'PASSWORD_RESET'
   | 'CLAIM_SUBMITTED'
   | 'CLAIM_APPROVED'
   | 'CLAIM_REJECTED'
