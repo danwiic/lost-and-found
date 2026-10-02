@@ -85,7 +85,25 @@ export default async function ItemPage({ params }: Props) {
           ) : null}
 
           <div className="mt-6 border-t border-line pt-6">
-            <p className="text-xs font-medium text-ink-muted">Reported by</p>
+            {/* Who handed the item in and who filed the record are two
+                different people on an OSAS intake, so they get two labels. The
+                finder block only reaches staff and the account the record sits
+                under — loadItem hides it from everyone else. */}
+            {item.finderName || item.finderContact ? (
+              <div className="mb-4">
+                <p className="text-xs font-medium text-ink-muted">Finder</p>
+                <p className="mt-1 text-sm text-ink">
+                  {item.finderName ?? 'Name not recorded'}
+                </p>
+                {item.finderContact ? (
+                  <p className="mt-1 text-sm text-ink-muted">{item.finderContact}</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            <p className="text-xs font-medium text-ink-muted">
+              {item.finderName || item.finderContact ? 'Recorded by' : 'Reported by'}
+            </p>
             <p className="mt-1 text-sm text-ink">{item.reporter.name}</p>
             {/* Contact details reach the owner and OSAS staff only. */}
             {item.reporter.contact ? (
