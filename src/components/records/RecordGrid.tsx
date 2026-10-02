@@ -12,7 +12,12 @@ import {
 } from '@/lib/format'
 
 /** A search result is a record that also knows how closely it matched. */
-export type GridRecord = RecordRow & { similarity?: number }
+export type GridRecord = RecordRow & {
+  /** Calibrated similarity — the score the match bar applies to. */
+  similarity?: number
+  /** Raw cosine behind it, shown only when the page is opened with ?debug=1. */
+  rawSimilarity?: number
+}
 
 /**
  * Records as scannable cards. Enough on each one to tell it apart from the
@@ -25,19 +30,28 @@ export type GridRecord = RecordRow & { similarity?: number }
  * When a card comes from a photo search it also carries its similarity, in
  * measurement type and the attention tone: it is the reason the card is on
  * screen. The score is never phrased as a chance of ownership (agents/UX.md §7.1).
- * A card below the match bar says so on its face — `threshold` is only passed
- * for near misses, and it flips the line from "this is why it's here" to
- * "this is how far short it fell".
+ * A card below the match bar says so on its face — `belowBar` is only set for
+ * near misses — but the bar itself is the system's setting, so the line never
+ * names the threshold the user cleared or missed.
  */
 export function RecordGrid({
   records,
-  threshold,
+  belowBar = false,
+  showRaw = false,
 }: {
   records: GridRecord[]
-  /** Present only for below-bar results: makes the similarity line honest. */
-  threshold?: number
+  /**
+   * Marks a below-bar result: its line says "not a match" without quoting the
+   * threshold. Only set for near misses; a match card never passes it.
+   */
+  belowBar?: boolean
+  /** Debug mode (?debug=1): also print the raw cosine each score came from. */
+  showRaw?: boolean
 }) {
-  const belowBar = typeof threshold === 'number'
+  const raw = (record: GridRecord) =>
+    showRaw && typeof record.rawSimilarity === 'number' ? (
+      <span className="data"> · raw {record.rawSimilarity.toFixed(4)}</span>
+    ) : null
   return (
     <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {records.map((record) => (
@@ -61,7 +75,8 @@ export function RecordGrid({
             belowBar ? (
               <p className="mt-2 text-xs text-ink-muted">
                 <span className="nums font-medium text-ink">{formatSimilarity(record.similarity)}</span>
-                <span> · below the {formatSimilarity(threshold)} match bar</span>
+                <span> · below the match bar</span>
+                {raw(record)}
               </p>
             ) : (
               <p className="mt-2 text-xs text-ink-muted">
@@ -69,6 +84,7 @@ export function RecordGrid({
                 <span className="nums font-medium text-attention">
                   {formatSimilarity(record.similarity)}
                 </span>
+                {raw(record)}
               </p>
             )
           ) : null}

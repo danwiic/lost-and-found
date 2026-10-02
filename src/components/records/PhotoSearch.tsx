@@ -1,11 +1,11 @@
 'use client'
 
+import { useSearchParams } from 'next/navigation'
 import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import { RecordGrid } from '@/components/records/RecordGrid'
 import { buttonClass, Spinner } from '@/components/ui/Button'
 import { EmptyState, ErrorNote } from '@/components/ui/EmptyState'
 import { Icon } from '@/components/ui/Icon'
-import { Panel, PanelHeading } from '@/components/ui/Panel'
 import { searchItemsByPhoto, type PhotoSearchResponse } from '@/lib/client-api'
 import { formatSimilarity } from '@/lib/format'
 
@@ -29,10 +29,17 @@ type SearchState =
  * application uses, each card carrying its similarity, and the browse list below
  * stays exactly where it was (agents/UX.md §1.3 — do not make people lose their
  * place for a small action).
+ *
+ * It renders bare (no panel of its own): the browse page hosts it inside the
+ * search area, under the "Search by photo" tab, so the two search modes read as
+ * one control.
  */
 export function PhotoSearch() {
   const inputId = useId()
   const fileInput = useRef<HTMLInputElement>(null)
+  // Tuning mode: `?debug=1` prints the raw cosine behind every score, so a
+  // threshold can be set without a terminal open. Nothing else changes.
+  const debug = useSearchParams().get('debug') === '1'
 
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -100,13 +107,7 @@ export function PhotoSearch() {
   const result = state.status === 'ready' ? state.result : null
 
   return (
-    <Panel>
-      <PanelHeading
-        title="Search by photo"
-        description="Search the ledger with a photo instead of words."
-      />
-
-      <div className="space-y-6 px-6 py-6 sm:px-6">
+    <div className="space-y-6">
         <div>
           <p className="mb-2 text-sm font-medium text-ink">Photo of the item</p>
 
@@ -236,19 +237,29 @@ export function PhotoSearch() {
                     : `${result.count} items look like that photo`}
               </h3>
               <p className="mt-1 text-xs text-ink-muted">
-                Every open item, at {formatSimilarity(result.threshold)} similarity or higher.
+                Open items whose photographs look closest to yours, best match first.
               </p>
+              {debug ? (
+                <p className="data mt-2 rounded-lg border border-line bg-surface-sunk px-3 py-2 text-xs text-ink-muted">
+                  debug · calibrated bar {result.threshold.toFixed(3)} · baseline{' '}
+                  {result.baseline.toFixed(2)} · near-miss floor {result.nearMissFloor.toFixed(2)} · top{' '}
+                  {result.topK} · scope {result.scope} · searched {result.searchedTypes.join('+')}
+                </p>
+              ) : null}
             </div>
 
             {result.count > 0 ? (
-              <RecordGrid records={result.matches} />
+              <RecordGrid records={result.matches} showRaw={debug} />
             ) : result.nearMissCount > 0 ? (
               <div className="space-y-3">
                 <p className="text-xs text-ink-muted">
-                  Nothing reached {formatSimilarity(result.threshold)}. Closest on file, ranked
-                  by resemblance:
+                  No clear match — the closest items on file, ranked by resemblance:
                 </p>
-                <RecordGrid records={result.nearMisses} threshold={result.threshold} />
+                <RecordGrid
+                  records={result.nearMisses}
+                  belowBar
+                  showRaw={debug}
+                />
               </div>
             ) : (
               <EmptyState
@@ -283,6 +294,5 @@ export function PhotoSearch() {
           </div>
         ) : null}
       </div>
-    </Panel>
   )
 }
