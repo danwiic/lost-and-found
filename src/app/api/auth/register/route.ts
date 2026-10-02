@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 import { conflict, handleRoute, json, readBody } from '@/lib/api'
 import { attachSessionCookie, createSessionToken, hashPassword } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { Fields } from '@/lib/validation'
+import { Fields, ValidationError } from '@/lib/validation'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +18,15 @@ export async function POST(request: NextRequest) {
     const studentId = fields.optionalText('studentId', 'Student / personnel ID', { max: 60 })
     const contact = fields.optionalText('contact', 'Contact information', { max: 120 })
     fields.throwIfInvalid()
+
+    // The signup form always sends the confirmation back; an API client may omit
+    // it. When it is present it must match exactly — the field exists to catch a
+    // mistyped password before the account is created. Compared untrimmed, since
+    // spaces are legitimate password characters.
+    const confirmation = body.confirmPassword
+    if (typeof confirmation === 'string' && confirmation !== '' && confirmation !== password) {
+      throw new ValidationError({ confirmPassword: 'Passwords do not match.' })
+    }
 
     // `email` and `password` are guaranteed non-empty once validation passes.
     const emailAddress = email as string

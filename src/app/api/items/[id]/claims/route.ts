@@ -11,6 +11,7 @@ import {
 import { requireUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { notifyMany } from '@/lib/notifications'
+import { savePhoto } from '@/lib/uploads'
 import { Fields } from '@/lib/validation'
 
 export const dynamic = 'force-dynamic'
@@ -26,8 +27,9 @@ const REPORTER_SELECT = {
 } as const
 
 /**
- * Files a claim against an item. The claim starts as PENDING, which is surfaced
- * in the UI as "Claim Pending Verification".
+ * Files a claim against an item (multipart/form-data with an optional
+ * `proofPhoto`, or JSON). The claim starts as PENDING, which is surfaced in the
+ * UI as "Claim Pending Verification".
  */
 export async function POST(request: NextRequest, context: Context) {
   return handleRoute(async () => {
@@ -69,7 +71,13 @@ export async function POST(request: NextRequest, context: Context) {
       max: 2000,
     })
     const proof = fields.requiredText('proof', 'Proof of ownership', { max: 2000 })
+    // The photo is optional — the written proof above is the part OSAS always
+    // gets. A file that is present but unusable (wrong type, too large, not an
+    // image) still fails the request, as a 400 from the uploader.
+    const proofPhoto = fields.files('proofPhoto')[0]
     fields.throwIfInvalid()
+
+    const proofImagePath = proofPhoto ? await savePhoto(proofPhoto) : null
 
     const claim = await prisma.claim.create({
       data: {
@@ -80,6 +88,7 @@ export async function POST(request: NextRequest, context: Context) {
         contact,
         additionalDetails: additionalDetails ?? null,
         proof,
+        proofImagePath,
       },
     })
 

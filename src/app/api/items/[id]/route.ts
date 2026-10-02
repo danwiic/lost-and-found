@@ -41,9 +41,14 @@ export async function GET(request: NextRequest, context: Context) {
 
     const maySeeMatches = item.reporterId === viewer.id || viewer.role === 'ADMIN'
 
+    // How many claims an item carries is activity on someone else's report, so
+    // it is only computed for the reporter and OSAS staff — the same convention
+    // photo search uses for matchCount (see lib/photo-search.ts).
     const [matches, claimsCount] = await Promise.all([
       maySeeMatches ? listMatchesForItem(item.id) : Promise.resolve([]),
-      prisma.claim.count({ where: { itemId: item.id } }),
+      maySeeMatches
+        ? prisma.claim.count({ where: { itemId: item.id } })
+        : Promise.resolve(0),
     ])
 
     return json({ item: toItemDetail(item, viewer), matches, claimsCount })
@@ -108,7 +113,10 @@ export async function PATCH(request: NextRequest, context: Context) {
   })
 }
 
-/** Removes a report (and its photo). Claims and matches cascade. */
+/**
+ * Removes a report (and its photo). Claims and matches cascade; the claims'
+ * own proof photos are files too, so they are removed with the row.
+ */
 export async function DELETE(request: NextRequest, context: Context) {
   return handleRoute(async () => {
     const viewer = await requireUser(request)
@@ -128,8 +136,16 @@ export async function DELETE(request: NextRequest, context: Context) {
       throw conflict('This item is part of a claim process and can no longer be deleted.')
     }
 
+    const claimPhotos = await prisma.claim.findMany({
+      where: { itemId: id, proofImagePath: { not: null } },
+      select: { proofImagePath: true },
+    })
+
     await prisma.item.delete({ where: { id } })
     if (item.imagePath) await deletePhoto(item.imagePath)
+    await Promise.all(
+      claimPhotos.map((claim) => (claim.proofImagePath ? deletePhoto(claim.proofImagePath) : null)),
+    )
 
     return json({ ok: true, deletedId: id })
   })

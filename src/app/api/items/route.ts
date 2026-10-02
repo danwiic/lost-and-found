@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server'
-import { badRequest, handleRoute, json, parsePagination, readBody } from '@/lib/api'
+import { badRequest, forbidden, handleRoute, json, parsePagination, readBody } from '@/lib/api'
 import { requireUser } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { embedImageBuffer, toVectorLiteral } from '@/lib/embed'
@@ -112,12 +112,34 @@ export async function POST(request: NextRequest) {
     const additionalDetails = fields.optionalText('additionalDetails', 'Additional details', {
       max: 2000,
     })
+    const finderName = fields.optionalText('finderName', "Finder's name", { max: 120 })
+    const finderContact = fields.optionalText('finderContact', "Finder's contact", { max: 120 })
+    const reporterId = fields.optionalText('reporterId', 'Reporter account')
 
     const photo = fields.files('photo')[0]
     if (!photo) {
       throw new ValidationError({ photo: 'A photo of the item is required.' })
     }
+    // Recording who physically handed an item over, and filing a report under
+    // someone else's account, are both OSAS desk actions. A student report
+    // carries neither field and stays untouched by this gate.
+    if (viewer.role !== 'ADMIN' && (finderName || finderContact || reporterId)) {
+      throw forbidden('Only OSAS staff can record who handed an item over.')
+    }
     fields.throwIfInvalid()
+
+    // The linked finder's account when one was chosen; otherwise the signed-in
+    // staff member files it. Resolved before the photo is saved so an unknown
+    // account cannot leave an orphaned upload behind.
+    let reportedById = viewer.id
+    if (reporterId) {
+      const linked = await prisma.user.findUnique({
+        where: { id: reporterId },
+        select: { id: true },
+      })
+      if (!linked) throw new ValidationError({ reporterId: 'No account matches that user.' })
+      reportedById = linked.id
+    }
 
     const imagePath = await savePhoto(photo)
 
@@ -131,7 +153,9 @@ export async function POST(request: NextRequest) {
         location,
         additionalDetails: additionalDetails ?? null,
         imagePath,
-        reporterId: viewer.id,
+        finderName: finderName ?? null,
+        finderContact: finderContact ?? null,
+        reporterId: reportedById,
       },
       include: { reporter: { select: REPORTER_SELECT } },
     })
@@ -152,7 +176,7 @@ export async function POST(request: NextRequest) {
         name,
         color: color ?? null,
         embedding,
-        reporterId: viewer.id,
+        reporterId: reportedById,
       })
       matches = outcome.matches
     } catch (error) {

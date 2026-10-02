@@ -3,7 +3,7 @@ import { forbidden, handleRoute, json, notFound } from '@/lib/api'
 import { requireUser } from '@/lib/auth'
 import { config } from '@/lib/config'
 import { prisma } from '@/lib/db'
-import { listMatchesForItem } from '@/lib/match'
+import { listMatchesForItem, MATCH_BASELINE } from '@/lib/match'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +31,8 @@ export async function GET(request: NextRequest, context: Context) {
     return json({
       itemId: item.id,
       threshold: config.matching.threshold,
+      // The raw-cosine floor the calibration subtracts — shown only by ?debug=1.
+      baseline: MATCH_BASELINE,
       matches: await listMatchesForItem(item.id),
     })
   })
