@@ -2,26 +2,30 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MOBILE_NAV } from '@/components/shell/nav-items'
+import { activeNavHref, mobileNavFor } from '@/components/shell/nav-items'
 import { Icon } from '@/components/ui/Icon'
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === '/') return pathname === '/'
-  return pathname === href || pathname.startsWith(`${href}/`)
-}
-
-/** Compact navigation bar for small screens (agents/UX.md §3.1). */
-export function MobileNav({ unread }: { unread: number }) {
+/**
+ * Compact navigation bar for small screens (agents/UX.md §3.1). It follows the
+ * viewer's role: OSAS staff get their own five destinations, so the whole staff
+ * surface is reachable on a phone instead of only by typing an /admin URL
+ * (agents/UX.md §3.2 — admin functionality is separated, not hidden).
+ */
+export function MobileNav({ role, unread }: { role: 'USER' | 'ADMIN'; unread: number }) {
   const pathname = usePathname()
+  const items = mobileNavFor(role)
+  const current = activeNavHref(pathname, items)
 
   return (
     <nav
       aria-label="Primary"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-rail/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
     >
-      <ul className="grid grid-cols-5">
-        {MOBILE_NAV.map((item) => {
-          const active = isActive(pathname, item.href)
+      {/* Six destinations for staff (Intake sits beside the Desk), five for
+          students — the grid follows the bar's own contents. */}
+      <ul className={`grid ${items.length === 6 ? 'grid-cols-6' : 'grid-cols-5'}`}>
+        {items.map((item) => {
+          const active = current === item.href
           return (
             <li key={item.href}>
               <Link

@@ -2,17 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { navFor } from '@/components/shell/nav-items'
+import { activeNavHref, navFor } from '@/components/shell/nav-items'
 import { Icon } from '@/components/ui/Icon'
-
-function isActive(pathname: string, href: string): boolean {
-  if (href === '/') return pathname === '/'
-  return pathname === href || pathname.startsWith(`${href}/`)
-}
 
 export function SideNav({ role, unread }: { role: 'USER' | 'ADMIN'; unread: number }) {
   const pathname = usePathname()
   const items = navFor(role)
+  const current = activeNavHref(pathname, items)
 
   return (
     <nav
@@ -29,7 +25,7 @@ export function SideNav({ role, unread }: { role: 'USER' | 'ADMIN'; unread: numb
 
         <ul className="space-y-1">
           {items.map((item) => {
-            const active = isActive(pathname, item.href)
+            const active = current === item.href
             return (
               <li key={item.href}>
                 <Link

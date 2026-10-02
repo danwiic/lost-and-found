@@ -23,6 +23,7 @@ export function Dialog({
   footer,
   tone = 'default',
   busy = false,
+  size = 'default',
 }: {
   open: boolean
   onClose: () => void
@@ -32,6 +33,8 @@ export function Dialog({
   footer: ReactNode
   tone?: Tone
   busy?: boolean
+  /** `wide` gives photographs room to be looked at; copy stays on `default`. */
+  size?: 'default' | 'wide'
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLElement | null>(null)
@@ -114,7 +117,9 @@ export function Dialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        className="drawer-panel relative w-full max-w-md rounded-lg border border-line bg-surface shadow-lift"
+        className={`drawer-panel relative w-full rounded-lg border border-line bg-surface shadow-lift ${
+          size === 'wide' ? 'max-w-3xl' : 'max-w-md'
+        }`}
       >
         <div className="flex items-start justify-between gap-4 px-6 pt-6">
           {tone === 'danger' ? (
