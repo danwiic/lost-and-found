@@ -75,14 +75,44 @@ Students register themselves, and every item in the system comes from a real rep
    calibrated = max(0, (raw - MATCH_BASELINE) / (1 - MATCH_BASELINE))
    ```
 
-5. Candidates above `MATCH_THRESHOLD` (0.87 calibrated) become `Match` rows. The notification
-   always goes to the **lost side** of the pair, in either arrival order.
+5. Candidates above `MATCH_THRESHOLD` (currently 0.45 calibrated — deliberately low while real
+   photo pairs are collected, so the final bar can be placed where true and false matches land)
+   become `Match` rows. The match notifies **both owners** of the pair in either arrival
+   order — a finder hears about a match too — and each notice points at the other report, so it
+   opens the item that matched rather than the one the owner already knows about.
 6. A score is a lead, never a verdict: the UI shows candidates with their similarity and lets a
    person decide ownership.
 
-Tuning is measurement-driven: every report and photo search logs `raw=`/`calibrated=` pairs to
-the server log (`[match]` and `[photo-search]` lines), and `npm run match:matrix` suggests a
-threshold from labelled photos.
+### Tuning the threshold — the matching lab
+
+MATCH_BASELINE and MATCH_THRESHOLD are environment variables, not constants in the code: change
+one and restart the app container (`docker compose up -d app`) — no rebuild. Both are read at
+startup and reported in every log line, so the values in force are never a guess.
+
+To set them from measurements, measure labelled pairs and keep the results:
+
+```bash
+npm run match:lab -- --a photo1.jpg --b photo2.jpg --label same      --category wallet
+npm run match:lab -- --a photo3.jpg --b photo4.jpg --label different --category wallet
+npm run match:lab -- --summary        # distribution, gap, and the threshold that splits them
+```
+
+Each pair is measured through the **real** pipeline (same embedder, same cosine, same
+calibration) and appended as one JSONL row to `matching-lab/results.jsonl` on the host, so the
+dataset accumulates across sessions instead of living in a chat log. Nothing is written to the
+database and the photos are not stored. The summary reports the mean/min/max of the SAME and
+DIFFERENT sets, whether they separate (and by how much), the threshold that splits them when
+they do, and which stored pairs the current threshold gets wrong. When the sets overlap it says
+so instead of inventing a number.
+
+Every score line — `[match]`, `[photo-search]` and `[matching-lab]` — carries `raw=`,
+`calibrated=`, `type=` and `category=`, so a later batch can test whether category filtering
+separates true from false matches better than similarity alone.
+
+**Seeing both scores in the UI:** add `?debug=1` to any page with a score on it (Browse, an item
+page, or a report's confirmation) and each reading shows the raw cosine and the calibrated value
+next to the threshold and baseline. Without the flag the interface shows only the calibrated
+number it always did.
 
 The model is **baked into the embedder image at build time** from `embedder/model-cache/`
 (pinned HuggingFace revision) — the container downloads nothing at runtime, so matching works
@@ -160,7 +190,7 @@ photo-search proves it writes nothing):
 
 ```bash
 npm run smoke                # full API journey: register → report → match → claim → decide → return, plus 401/403/409/422 and path-traversal cases
-npm run verify:match         # both arrival orders produce a Match row + notification; the finder is never notified
+npm run verify:match         # both arrival orders produce a Match row + a notice to each owner, pointing at the other item
 npm run check:photo-search   # search by photo honours threshold/type/limit and persists nothing
 npm run match:matrix -- <dir> --pair <photoA>,<photoB>   # measured similarity + suggested threshold
 ```
@@ -264,11 +294,12 @@ UPLOAD_DIR=/app/uploads
 MAX_UPLOAD_MB=8
 EMBEDDER_URL=http://embedder:8000
 MATCH_BASELINE=0.6                 # raw cosine noise floor (calibration)
-MATCH_THRESHOLD=0.87               # calibrated units
+MATCH_THRESHOLD=0.45               # calibrated units; provisional while pairs are collected
 MATCH_TOP_K=10
 MATCH_COLOR_BOOST=0.02
 PHOTO_SEARCH_NEAR_MISSES=3         # optional: below-threshold leads shown by photo search
 PHOTO_SEARCH_NEAR_MISS_FLOOR=0.6   # optional: lowest calibrated near-miss score
+MATCHING_LAB_DIR=/app/matching-lab # optional: where the matching lab appends its dataset
 ```
 
 Inside Compose the app container gets its values from `docker-compose.yml`; tuning the
