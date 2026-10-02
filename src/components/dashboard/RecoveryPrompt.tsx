@@ -45,8 +45,8 @@ export function RecoveryPrompt() {
       <div className="px-6 py-6 sm:px-6">
         <p className="measure text-[0.9375rem] text-ink-muted">
           This system sends no reset emails. Instead, three security questions on your account are
-          the way back in if you forget your password — and without them, only the OSAS office can
-          reset it. You pick the questions and answer them yourself.
+          the way back in if you forget your password. You pick the questions and answer them
+          yourself.
         </p>
 
         {error ? (

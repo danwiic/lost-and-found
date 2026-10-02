@@ -97,11 +97,25 @@ export function AccountMenu({
             ) : null}
           </div>
 
+          {role === 'ADMIN' ? (
+            // The staff bottom bar is full at six destinations, so the rare
+            // errand — helping a student who cannot sign in — lives here.
+            <Link
+              href="/admin/accounts"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-muted transition-colors hover:bg-surface-sunk hover:text-ink"
+            >
+              <Icon name="copy" className="h-4 w-4" />
+              Student accounts
+            </Link>
+          ) : null}
+
           <Link
             href="/profile"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-muted transition-colors hover:bg-surface-sunk hover:text-ink"
+            className={`${role === 'ADMIN' ? '' : 'mt-1 '}flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-muted transition-colors hover:bg-surface-sunk hover:text-ink`}
           >
             <Icon name="user" className="h-4 w-4" />
             Profile

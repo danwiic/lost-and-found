@@ -149,7 +149,7 @@ export function RecoverySection({ current }: { current: RecoveryQuestion[] }) {
       {firstTime ? (
         <p className="measure text-sm text-ink-muted">
           Pick three questions and answer them. If you ever forget your password, these are the way
-          back in — without them, a reset means a trip to the OSAS office.
+          back in — there is no reset email in this system.
         </p>
       ) : null}
 
