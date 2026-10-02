@@ -54,16 +54,23 @@ services:
       # before they are thresholded or shown. Tune both from the raw=/calibrated=
       # pairs in the [match] and [photo-search] log lines.
       MATCH_BASELINE: ${MATCH_BASELINE:-0.6}
-      MATCH_THRESHOLD: ${MATCH_THRESHOLD:-0.87}
+      MATCH_THRESHOLD: ${MATCH_THRESHOLD:-0.45}
       MATCH_TOP_K: ${MATCH_TOP_K:-10}
       MATCH_COLOR_BOOST: ${MATCH_COLOR_BOOST:-0.02}
       # Below-threshold "closest on file" leads shown by the read-only photo search.
       PHOTO_SEARCH_NEAR_MISSES: ${PHOTO_SEARCH_NEAR_MISSES:-3}
       PHOTO_SEARCH_NEAR_MISS_FLOOR: ${PHOTO_SEARCH_NEAR_MISS_FLOOR:-0.6}
+      # Where the matching lab appends its labelled dataset (one JSONL row per
+      # pair). Bind-mounted below, so the dataset lives on the host and survives
+      # container rebuilds.
+      MATCHING_LAB_DIR: /app/matching-lab
     ports:
       - '3000:3000'
     volumes:
       - uploads:/app/uploads
+      # The matching-lab dataset: visible on the host at ./matching-lab so the
+      # measurements accumulate outside the container.
+      - ./matching-lab:/app/matching-lab
     healthcheck:
       test:
         - CMD
