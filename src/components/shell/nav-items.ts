@@ -23,10 +23,28 @@ export const USER_NAV: NavItem[] = [
  */
 export const MOBILE_NAV: NavItem[] = USER_NAV.filter((item) => item.href !== '/profile')
 
-const ADMIN_NAV: NavItem[] = [
+export const ADMIN_NAV: NavItem[] = [
   { href: '/admin', label: 'Dashboard', icon: 'home' },
+  // Second in the day's order: what someone just handed over the counter.
+  { href: '/admin/intake', label: 'Intake', icon: 'plus' },
   { href: '/admin/lost', label: 'Lost Items', icon: 'ledger' },
   { href: '/admin/found', label: 'Found Items', icon: 'ledger' },
+  { href: '/admin/claims', label: 'Claims', icon: 'claim' },
+  { href: '/admin/returns', label: 'Returns', icon: 'check' },
+]
+
+/**
+ * The admin bottom bar. Shortened labels so five destinations fit a phone
+ * width without truncating: the destination is the same, only the wording is
+ * tighter. Notifications is deliberately absent — the header bell already
+ * carries the unread count, and it is the one destination the user bar and the
+ * admin bar share.
+ */
+export const ADMIN_MOBILE_NAV: NavItem[] = [
+  { href: '/admin', label: 'Desk', icon: 'home' },
+  { href: '/admin/intake', label: 'Intake', icon: 'plus' },
+  { href: '/admin/lost', label: 'Lost', icon: 'ledger' },
+  { href: '/admin/found', label: 'Found', icon: 'ledger' },
   { href: '/admin/claims', label: 'Claims', icon: 'claim' },
   { href: '/admin/returns', label: 'Returns', icon: 'check' },
 ]
@@ -34,4 +52,29 @@ const ADMIN_NAV: NavItem[] = [
 /** OSAS staff keep their own navigation, separated from the student one. */
 export function navFor(role: 'USER' | 'ADMIN'): NavItem[] {
   return role === 'ADMIN' ? ADMIN_NAV : USER_NAV
+}
+
+/**
+ * The one destination a pathname belongs to: the longest href that matches it
+ * exactly or as a parent path. Without picking the longest, `/admin` claims
+ * every `/admin/...` page and the dashboard stays lit while another admin
+ * destination is the one being viewed.
+ */
+export function activeNavHref(pathname: string, items: readonly NavItem[]): string | null {
+  let match: string | null = null
+
+  for (const item of items) {
+    const hit =
+      item.href === '/'
+        ? pathname === '/'
+        : pathname === item.href || pathname.startsWith(`${item.href}/`)
+    if (hit && (match === null || item.href.length > match.length)) match = item.href
+  }
+
+  return match
+}
+
+/** The same split for the small-screen bottom bar (agents/UX.md §3.2). */
+export function mobileNavFor(role: 'USER' | 'ADMIN'): NavItem[] {
+  return role === 'ADMIN' ? ADMIN_MOBILE_NAV : MOBILE_NAV
 }

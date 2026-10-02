@@ -23,6 +23,8 @@ export type ItemLike = {
   additionalDetails: string | null
   imagePath: string | null
   status: string
+  finderName?: string | null
+  finderContact?: string | null
   reporterId: string
   createdAt: Date
   updatedAt: Date
@@ -34,6 +36,16 @@ export type ItemDetail = ReturnType<typeof toItemDetail>
 
 function photoUrl(imagePath: string | null): string | null {
   return imagePath ? `/api/files/${imagePath}` : null
+}
+
+/**
+ * The finder's identity is recorded for the office's chain of custody, not for
+ * the public record: only OSAS staff and the account the report sits under see
+ * it. Everyone else reads the report without it.
+ */
+function canSeeFinder(item: ItemLike, viewer?: AuthedUser | null): boolean {
+  if (!viewer) return false
+  return viewer.role === 'ADMIN' || viewer.id === item.reporterId
 }
 
 /** Shape used by browse lists, dashboards and My Reports. */
@@ -48,6 +60,8 @@ export function toItemSummary(item: ItemLike, viewer?: AuthedUser | null) {
     location: item.location,
     status: item.status,
     photoUrl: photoUrl(item.imagePath),
+    finderName: canSeeFinder(item, viewer) ? (item.finderName ?? null) : null,
+    finderContact: canSeeFinder(item, viewer) ? (item.finderContact ?? null) : null,
     reporterId: item.reporterId,
     reporterName: item.reporter?.name ?? null,
     isMine: viewer?.id === item.reporterId,
