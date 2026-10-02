@@ -17,7 +17,10 @@ export type MatchCandidate = {
   /** File name on the photo route; build the URL with matchPhotoUrl(). */
   imagePath: string | null
   reporterName: string
+  /** Calibrated similarity — the number the match bar applies to. */
   similarity: number
+  /** Raw cosine behind the calibrated score — shown only with ?debug=1. */
+  raw: number
   colorMatch: boolean
 }
 
@@ -26,7 +29,12 @@ export function matchPhotoUrl(match: Pick<MatchCandidate, 'imagePath'>): string 
   return match.imagePath ? `/api/files/${match.imagePath}` : null
 }
 
-export type MatchResponse = { threshold: number; matches: MatchCandidate[] }
+export type MatchResponse = {
+  threshold: number
+  /** Raw-cosine noise floor the calibration subtracts — shown with ?debug=1. */
+  baseline: number
+  matches: MatchCandidate[]
+}
 
 /**
  * A failed request that carries whatever the API actually said. Field-level
@@ -98,7 +106,11 @@ export async function fetchItemMatches(itemId: string, signal?: AbortSignal): Pr
   if (!response.ok) throw new Error(await failureMessage(response))
 
   const data = (await response.json()) as Partial<MatchResponse>
-  return { threshold: data.threshold ?? 0, matches: data.matches ?? [] }
+  return {
+    threshold: data.threshold ?? 0,
+    baseline: data.baseline ?? 0,
+    matches: data.matches ?? [],
+  }
 }
 
 export async function setNotificationRead(
@@ -109,6 +121,9 @@ export async function setNotificationRead(
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ read }),
+    // A notice is often opened as a link to another page; the write must
+    // survive the navigation that follows the click.
+    keepalive: true,
   })
   if (!response.ok) throw new Error(await failureMessage(response))
 
@@ -131,6 +146,32 @@ export type ReportResponse = {
   matches: MatchCandidate[]
   /** Present when the photo was stored but image matching could not run. */
   warning?: string
+}
+
+/** A registered account the intake desk can file a found item under. */
+export type UserLookup = {
+  id: string
+  name: string
+  email: string
+  studentId: string | null
+}
+
+/**
+ * Admin-only account search for the intake form. Matches name, email or
+ * student ID; fewer than two characters returns nothing.
+ */
+export async function searchUserAccounts(
+  q: string,
+  signal?: AbortSignal,
+): Promise<UserLookup[]> {
+  const response = await fetch(`/api/admin/users?q=${encodeURIComponent(q)}`, {
+    headers: { accept: 'application/json' },
+    signal,
+  })
+  if (!response.ok) throw await parseFailure(response)
+
+  const data = (await response.json()) as { users?: UserLookup[] }
+  return data.users ?? []
 }
 
 /**
@@ -158,15 +199,24 @@ export type ClaimInput = {
   proof: string
 }
 
-/** Files a claim. It always starts PENDING — this never implies approval. */
+/**
+ * Files a claim, with the optional proof photo travelling as multipart so the
+ * file goes with the fields. It always starts PENDING — this never implies
+ * approval.
+ */
 export async function submitClaim(
   itemId: string,
   input: ClaimInput,
+  proofPhoto: File | null = null,
 ): Promise<{ claimId: string; message: string }> {
+  const form = new FormData()
+  for (const [field, value] of Object.entries(input)) form.set(field, value)
+  // Photo last: the server reads it as the multipart file part.
+  if (proofPhoto) form.set('proofPhoto', proofPhoto)
+
   const response = await fetch(`/api/items/${itemId}/claims`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(input),
+    body: form,
   })
   if (!response.ok) throw await parseFailure(response)
 
@@ -257,6 +307,9 @@ export type PhotoSearchMatch = {
   matchCount: number
   isMine: boolean
   reporterName: string | null
+  /** Never populated on a photo search — the finder is office information. */
+  finderName: string | null
+  finderContact: string | null
   /** Calibrated similarity — the only score the UI shows. */
   similarity: number
   /** Raw cosine the calibration came from — logging and tuning only. */
@@ -274,6 +327,8 @@ export type PhotoSearchResponse = {
   nearMissCount: number
   /** The similarity a candidate had to reach to be returned. */
   threshold: number
+  /** The raw-cosine noise floor the calibration subtracts — shown with ?debug=1. */
+  baseline: number
   /** Lowest similarity a near miss may have. */
   nearMissFloor: number
   topK: number

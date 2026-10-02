@@ -15,7 +15,10 @@ export type NoticeRow = {
   read: boolean
   itemId: string | null
   matchId: string | null
-  /** The recipient's own item for match notices, or the claimed item. */
+  /**
+   * For a match notice, the other item of the pair — the one that matched, and
+   * the one the notice opens. Otherwise the item the notice is about.
+   */
   item: { id: string; name: string; type: string; status: string; photoUrl: string | null } | null
 }
 

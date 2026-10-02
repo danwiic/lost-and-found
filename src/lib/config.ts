@@ -50,12 +50,15 @@ export const config = {
      * Calibrated similarity a candidate must reach to become a possible match.
      * Every score is calibrated first: raw cosine minus MATCH_BASELINE,
      * rescaled to 0-1 (see lib/match.ts), so the noise floor of unrelated
-     * photos calibrates to ~0 instead of ~0.6. 0.87 calibrated is therefore a
-     * much higher raw bar than it used to be — with baseline 0.6 it equals a
-     * raw cosine of ~0.948. Tune it from the `raw=`/`calibrated=` numbers in
-     * the `[match]` and `[photo-search]` log lines, never from a guess.
+     * photos calibrates to ~0 instead of ~0.6.
+     *
+     * Deliberately low for now (0.45): the bar is set this way only to collect
+     * real pairs — the same object photographed twice, and different but
+     * similar objects — so the final value can be placed where true matches and
+     * false matches actually land. Raise it from the `raw=`/`calibrated=`
+     * numbers in the `[match]` and `[photo-search]` log lines, never a guess.
      */
-    threshold: num('MATCH_THRESHOLD', 0.87),
+    threshold: num('MATCH_THRESHOLD', 0.45),
     /** Candidates requested from pgvector per report. */
     topK: num('MATCH_TOP_K', 10),
     /** Ranking bonus when the reported colours look like the same colour. */

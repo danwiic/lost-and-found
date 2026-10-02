@@ -1,6 +1,7 @@
 import { config } from '@/lib/config'
 import { embedImageBuffer } from '@/lib/embed'
 import {
+  categoryTokens,
   findSimilarItems,
   MATCH_BASELINE,
   SEARCHABLE_STATUSES,
@@ -41,6 +42,8 @@ export type PhotoSearchResult = {
   nearMisses: PhotoMatch[]
   /** The similarity a candidate had to reach to be returned. */
   threshold: number
+  /** The raw-cosine noise floor the calibration subtracts (debug view). */
+  baseline: number
   /** Lowest similarity a near miss may have. */
   nearMissFloor: number
   /** How many candidates were asked of the vector index. */
@@ -89,6 +92,10 @@ export async function searchItemsByPhoto(input: {
       matchCount: 0,
       isMine: candidate.reporterId === input.viewer.id,
       reporterName: candidate.reporterName,
+      // The finder is office information and this is not an office surface:
+      // the search never selects it, so the row carries an explicit null.
+      finderName: null,
+      finderContact: null,
       similarity: candidate.similarity,
       rawSimilarity: candidate.rawSimilarity,
     }))
@@ -102,7 +109,11 @@ export async function searchItemsByPhoto(input: {
   for (const candidate of scored) {
     console.log(
       `[photo-search] item=${candidate.id} raw=${candidate.rawSimilarity.toFixed(4)} ` +
-        `calibrated=${candidate.similarity.toFixed(4)} "${candidate.name}"`,
+        `calibrated=${candidate.similarity.toFixed(4)} type=${candidate.type} ` +
+        // Category is the item name's descriptive tokens — the data model's
+        // closest thing to one — recorded now so a later batch can test whether
+        // category filtering separates true from false matches better.
+        `category="${categoryTokens(candidate.name).join('|')}" "${candidate.name}"`,
     )
   }
 
@@ -124,6 +135,7 @@ export async function searchItemsByPhoto(input: {
       matches,
       nearMisses,
       threshold: config.matching.threshold,
+      baseline: MATCH_BASELINE,
       nearMissFloor: config.matching.nearMissFloor,
       topK,
       scope: input.scope,
@@ -140,6 +152,7 @@ export async function searchItemsByPhoto(input: {
     matches,
     nearMisses: [],
     threshold: config.matching.threshold,
+    baseline: MATCH_BASELINE,
     nearMissFloor: config.matching.nearMissFloor,
     topK,
     scope: input.scope,

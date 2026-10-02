@@ -37,6 +37,15 @@ export function calibrateSimilarity(rawSimilarity: number): number {
   return Math.max(0, (rawSimilarity - MATCH_BASELINE) / (1 - MATCH_BASELINE))
 }
 
+/**
+ * The inverse of calibrateSimilarity. A stored Match row keeps only the
+ * calibrated score, and the debug view wants the raw number the two photos
+ * actually scored — this recovers it exactly.
+ */
+export function rawFromCalibrated(calibrated: number): number {
+  return calibrated * (1 - MATCH_BASELINE) + MATCH_BASELINE
+}
+
 /** A row returned by the pgvector similarity query. */
 type CandidateRow = {
   id: string
@@ -68,8 +77,10 @@ export type MatchCandidate = {
   imagePath: string | null
   dateEvent: Date
   reporterName: string
-  /** Raw cosine similarity straight from pgvector. */
+  /** Calibrated similarity — the number the bar is applied to. */
   similarity: number
+  /** Raw cosine the calibrated score came from: logging and tuning only. */
+  raw: number
   /** similarity + colour bonus, used for ranking only. */
   score: number
   colorMatch: boolean
@@ -287,6 +298,11 @@ function logMatchRun(run: {
       `[match]   raw=${entry.candidate.rawSimilarity.toFixed(4)} ` +
         `calibrated=${entry.similarity.toFixed(4)}  ` +
         `${entry.colorMatch ? 'colour~match' : 'colour=no   '}  ` +
+        // Type and category sit next to the score so the dataset can answer
+        // "would filtering on category separate true from false better than
+        // similarity alone?" without re-running anything.
+        `type=${entry.candidate.type} ` +
+        `category="${categoryTokens(entry.candidate.name).join('|')}"  ` +
         `"${entry.candidate.name}" (${entry.candidate.id}) -> ${verdict}`,
     )
   }
@@ -397,30 +413,49 @@ export async function matchNewItem(options: {
     if (!existing) {
       created = true
 
-      // One rule for both arrival orders: the LOST side of the pair is notified.
+      // Both sides of the pair are told, whichever item arrived second, and
+      // each notice points at the OTHER item: the recipient's own report is what
+      // they already know, the counterpart is the news. Naming the two sides
+      // once here also keeps the wording right in both arrival orders.
       const percent = Math.round(entry.similarity * 100)
-      const notice: Omit<NotificationInput, 'type' | 'matchId'> =
-        options.type === 'FOUND'
-          ? {
-              // A new found item just landed on an existing lost report.
-              userId: candidate.reporterId,
-              itemId: candidate.id,
-              message:
-                `Possible match for your lost report "${candidate.name}": ` +
-                `a newly reported found item "${options.name}" is ${percent}% similar.`,
-            }
-          : {
-              // A new lost report just landed on a found item already on file.
-              // The reporter is in the app right now, but the notice is what makes
-              // the candidate list outlive that confirmation screen.
-              userId: options.reporterId,
-              itemId: options.itemId,
-              message:
-                `Possible match for your lost report "${options.name}": ` +
-                `a found item already on file, "${candidate.name}", is ${percent}% similar.`,
-            }
+      const newIsLost = options.type === 'LOST'
+      const lost = newIsLost
+        ? { id: options.itemId, name: options.name, reporterId: options.reporterId }
+        : { id: candidate.id, name: candidate.name, reporterId: candidate.reporterId }
+      const found = newIsLost
+        ? { id: candidate.id, name: candidate.name, reporterId: candidate.reporterId }
+        : { id: options.itemId, name: options.name, reporterId: options.reporterId }
+      const arrivedLost = newIsLost
+        ? `a newly reported lost item "${lost.name}"`
+        : `a lost item already on file, "${lost.name}",`
+      const arrivedFound = newIsLost
+        ? `a found item already on file, "${found.name}",`
+        : `a newly reported found item "${found.name}"`
 
-      notifications.push({ ...notice, type: 'POSSIBLE_MATCH', matchId: match.id })
+      const pairNotices: Omit<NotificationInput, 'type' | 'matchId'>[] = [
+        {
+          userId: lost.reporterId,
+          itemId: found.id,
+          message:
+            `Possible match for your lost report "${lost.name}": ` +
+            `${arrivedFound} is ${percent}% similar.`,
+        },
+        {
+          userId: found.reporterId,
+          itemId: lost.id,
+          message:
+            `Possible match for your found report "${found.name}": ` +
+            `${arrivedLost} is ${percent}% similar.`,
+        },
+      ]
+
+      const told = new Set<string>()
+      for (const notice of pairNotices) {
+        // One person can be both sides of a pair; they hear about it once.
+        if (told.has(notice.userId)) continue
+        told.add(notice.userId)
+        notifications.push({ ...notice, type: 'POSSIBLE_MATCH', matchId: match.id })
+      }
     }
 
     matches.push({
@@ -435,6 +470,7 @@ export async function matchNewItem(options: {
       dateEvent: candidate.dateEvent,
       reporterName: candidate.reporterName,
       similarity: entry.similarity,
+      raw: candidate.rawSimilarity,
       score: entry.score,
       colorMatch: entry.colorMatch,
     })
@@ -494,6 +530,9 @@ export async function listMatchesForItem(itemId: string): Promise<MatchCandidate
       dateEvent: other.dateEvent,
       reporterName: other.reporter.name,
       similarity: row.similarity,
+      // A stored Match row keeps only the calibrated score; recover the raw one
+      // so the debug view can show both.
+      raw: rawFromCalibrated(row.similarity),
       score: row.similarity,
       colorMatch: false,
     }

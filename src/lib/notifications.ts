@@ -14,7 +14,11 @@ export type NotificationInput = {
   /** Lets the UI open "View Match" straight away. */
   matchId?: string | null
   claimId?: string | null
-  /** The recipient's own item, so "My Reports" can deep-link to it. */
+  /**
+   * The item the notice opens. For a possible match that is the OTHER item of
+   * the pair — the counterpart is the news — and otherwise the item the notice
+   * is about (claimed, returned).
+   */
   itemId?: string | null
 }
 

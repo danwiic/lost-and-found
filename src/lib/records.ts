@@ -1,5 +1,6 @@
 import { ClaimStatus, ItemStatus } from '@/generated/prisma/enums'
 import { prisma } from '@/lib/db'
+import { listMatchesForItem, type MatchCandidate } from '@/lib/match'
 import type { SessionUser } from '@/lib/session'
 
 /**
@@ -43,6 +44,12 @@ export type RecordRow = {
   /** The viewer filed this report. Browse mixes in other people's records. */
   isMine: boolean
   reporterName: string | null
+  /**
+   * Who handed the item over at the counter. Captured by the OSAS intake flow
+   * and hidden from everyone but staff and the account the record sits under.
+   */
+  finderName: string | null
+  finderContact: string | null
 }
 
 const RECORD_SELECT = {
@@ -54,9 +61,11 @@ const RECORD_SELECT = {
   location: true,
   dateEvent: true,
   status: true,
-  imagePath: true,
-  createdAt: true,
+  imagePath: true,  createdAt: true,
   reporterId: true,
+  finderName: true,
+  finderContact: true,
+
   reporter: { select: { name: true } },
   _count: { select: { lostMatches: true, foundMatches: true } },
 } as const
@@ -73,6 +82,8 @@ type RecordShape = {
   imagePath: string | null
   createdAt: Date
   reporterId: string
+  finderName: string | null
+  finderContact: string | null
   reporter: { name: string } | null
   _count: { lostMatches: number; foundMatches: number }
 }
@@ -87,6 +98,9 @@ type Viewer = { id: string; role: string }
 function toRecord(item: RecordShape, viewer: Viewer | null): RecordRow {
   const isMine = viewer !== null && item.reporterId === viewer.id
   const maySeeMatches = isMine || viewer?.role === 'ADMIN'
+  // Same audience as matches: the finder is office information, shown to staff
+  // and to the account the record is filed under, never to other students.
+  const maySeeFinder = maySeeMatches
 
   return {
     id: item.id,
@@ -102,6 +116,8 @@ function toRecord(item: RecordShape, viewer: Viewer | null): RecordRow {
     matchCount: maySeeMatches ? item._count.lostMatches + item._count.foundMatches : 0,
     isMine,
     reporterName: item.reporter?.name ?? null,
+    finderName: maySeeFinder ? item.finderName : null,
+    finderContact: maySeeFinder ? item.finderContact : null,
   }
 }
 
@@ -143,6 +159,10 @@ export type BrowseFilters = {
   type: '' | 'LOST' | 'FOUND'
   status: string
   color: string
+  /** Restrict to items reported in the last N days; '' or 0 means any date. */
+  days: 0 | 7 | 30
+  /** 'newest' (default) | 'oldest' — the direction of the createdAt ordering. */
+  sort: 'newest' | 'oldest'
   page: number
 }
 
@@ -151,18 +171,22 @@ const BROWSE_PAGE_SIZE = 12
 export function readBrowseFilters(params: URLSearchParams): BrowseFilters {
   const type = (params.get('type') ?? '').toUpperCase()
   const page = Number(params.get('page') ?? '1')
+  const rawDays = Number(params.get('days') ?? '0')
+  const days = rawDays === 7 || rawDays === 30 ? rawDays : 0
 
   return {
     q: (params.get('q') ?? '').trim(),
     type: type === 'LOST' || type === 'FOUND' ? type : '',
     status: (params.get('status') ?? '').toUpperCase(),
     color: (params.get('color') ?? '').trim(),
+    days,
+    sort: params.get('sort') === 'oldest' ? 'oldest' : 'newest',
     page: Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
   }
 }
 
 export function hasActiveFilters(filters: BrowseFilters): boolean {
-  return Boolean(filters.q || filters.type || filters.status || filters.color)
+  return Boolean(filters.q || filters.type || filters.status || filters.color || filters.days)
 }
 
 export async function loadBrowse(
@@ -175,6 +199,9 @@ export async function loadBrowse(
     ...(filters.type ? { type: filters.type } : {}),
     ...(status ? { status } : {}),
     ...(filters.color ? { color: { contains: filters.color, mode: 'insensitive' as const } } : {}),
+    ...(filters.days
+      ? { createdAt: { gte: new Date(Date.now() - filters.days * 86_400_000) } }
+      : {}),
     ...(filters.q
       ? {
           OR: [
@@ -191,7 +218,7 @@ export async function loadBrowse(
     prisma.item.count({ where }),
     prisma.item.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: filters.sort === 'oldest' ? 'asc' : 'desc' },
       skip: (filters.page - 1) * BROWSE_PAGE_SIZE,
       take: BROWSE_PAGE_SIZE,
       select: RECORD_SELECT,
@@ -203,6 +230,16 @@ export async function loadBrowse(
     total,
     pageCount: Math.max(1, Math.ceil(total / BROWSE_PAGE_SIZE)),
   }
+}
+
+/** The newest records on file — the browse page's "Recently added" band. */
+export async function loadRecentItems(viewer: Viewer, take = 6): Promise<RecordRow[]> {
+  const items = await prisma.item.findMany({
+    orderBy: { createdAt: 'desc' },
+    take,
+    select: RECORD_SELECT,
+  })
+  return items.map((item) => toRecord(item, viewer))
 }
 
 /* ------------------------------------------------------------------ *
@@ -373,6 +410,12 @@ export type ClaimListRow = {
     reporterName: string | null
   }
   returnRecord: { id: string; returnDate: string; notes: string | null } | null
+  /**
+   * Approved but not yet handed over: the claim is verified, the item is still
+   * on the shelf. This is the state that needs a person to walk to the shelf, so
+   * the claims list can filter on it (see loadAdminClaims).
+   */
+  awaitingRelease: boolean
 }
 
 type ClaimListShape = {
@@ -426,6 +469,7 @@ function toClaimRow(claim: ClaimListShape): ClaimListRow {
           notes: claim.returns[0].notes,
         }
       : null,
+    awaitingRelease: claim.status === 'APPROVED' && claim.returns.length === 0,
   }
 }
 
@@ -525,6 +569,10 @@ export async function loadAdminItems(
             { description: { contains: filters.q, mode: 'insensitive' as const } },
             { color: { contains: filters.q, mode: 'insensitive' as const } },
             { location: { contains: filters.q, mode: 'insensitive' as const } },
+            // "Did Ana hand in a phone?" — the finder is staff information, so
+            // only this admin-side search may read it.
+            { finderName: { contains: filters.q, mode: 'insensitive' as const } },
+            { finderContact: { contains: filters.q, mode: 'insensitive' as const } },
           ],
         }
       : {}),
@@ -553,7 +601,16 @@ export async function loadAdminClaims(filters: {
   page: number
 }): Promise<{ claims: ClaimListRow[]; total: number; pageCount: number }> {
   const status = readClaimStatus(filters.status)
-  const where = status ? { status } : {}
+
+  // `?status=AWAITING_RELEASE` is not a claim status — it is the gap between two
+  // of them: approved, with no return recorded. It is the only view where a
+  // person has to walk to the shelf, so it is its own filter.
+  const awaitingRelease = filters.status.toUpperCase() === 'AWAITING_RELEASE'
+  const where = awaitingRelease
+    ? { status: ClaimStatus.APPROVED, returns: { none: {} } }
+    : status
+      ? { status }
+      : {}
 
   const [total, claims] = await Promise.all([
     prisma.claim.count({ where }),
@@ -574,7 +631,14 @@ export async function loadAdminClaims(filters: {
   }
 }
 
-export type ClaimCounts = { total: number; pending: number; approved: number; rejected: number }
+export type ClaimCounts = {
+  total: number
+  pending: number
+  approved: number
+  rejected: number
+  /** Approved with no return recorded — the items physically still on the shelf. */
+  awaitingRelease: number
+}
 
 /**
  * Claim counts across the whole queue, independent of the page or filter being
@@ -582,9 +646,12 @@ export type ClaimCounts = { total: number; pending: number; approved: number; re
  * approved claims.
  */
 export async function loadClaimCounts(): Promise<ClaimCounts> {
-  const grouped = await prisma.claim.groupBy({ by: ['status'], _count: { _all: true } })
+  const [grouped, awaitingRelease] = await Promise.all([
+    prisma.claim.groupBy({ by: ['status'], _count: { _all: true } }),
+    prisma.claim.count({ where: { status: ClaimStatus.APPROVED, returns: { none: {} } } }),
+  ])
 
-  const counts: ClaimCounts = { total: 0, pending: 0, approved: 0, rejected: 0 }
+  const counts: ClaimCounts = { total: 0, pending: 0, approved: 0, rejected: 0, awaitingRelease }
   for (const row of grouped) {
     const n = row._count._all
     counts.total += n
@@ -599,12 +666,28 @@ export type ClaimDetail = ClaimListRow & {
   additionalDetails: string | null
   /** Nullable in the schema; the API always requires it, so it is present in practice. */
   proof: string | null
+  /** The optional photo attached as proof; null when the claimant attached none. */
+  proofPhotoUrl: string | null
   item: ClaimListRow['item'] & {
     description: string
     color: string | null
     additionalDetails: string | null
     reporter: { id: string; name: string; email: string; contact: string | null }
   }
+  /**
+   * The other claims on the same item, so a decision is never made blind to a
+   * competing claimant — the API rejects competitors on approval, and this is
+   * how staff see them coming. Pending first, then oldest first.
+   */
+  otherClaims: Array<{
+    id: string
+    status: string
+    claimantName: string
+    studentId: string | null
+    createdAt: string
+  }>
+  /** The item's candidate matches — the visual leads OSAS is asked to weigh. */
+  matches: MatchCandidate[]
 }
 
 /** One claim in full, for OSAS verification. */
@@ -615,6 +698,7 @@ export async function loadClaim(id: string): Promise<ClaimDetail | null> {
       ...CLAIM_LIST_SELECT,
       additionalDetails: true,
       proof: true,
+      proofImagePath: true,
       item: {
         select: {
           id: true,
@@ -634,10 +718,20 @@ export async function loadClaim(id: string): Promise<ClaimDetail | null> {
   })
   if (!claim) return null
 
+  const [otherClaims, matches] = await Promise.all([
+    prisma.claim.findMany({
+      where: { itemId: claim.item.id, id: { not: claim.id } },
+      orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true, status: true, claimantName: true, studentId: true, createdAt: true },
+    }),
+    listMatchesForItem(claim.item.id),
+  ])
+
   return {
     ...toClaimRow(claim),
     additionalDetails: claim.additionalDetails,
     proof: claim.proof,
+    proofPhotoUrl: photoUrl(claim.proofImagePath),
     item: {
       ...toClaimRow(claim).item,
       description: claim.item.description,
@@ -645,6 +739,14 @@ export async function loadClaim(id: string): Promise<ClaimDetail | null> {
       additionalDetails: claim.item.additionalDetails,
       reporter: claim.item.reporter,
     },
+    otherClaims: otherClaims.map((row) => ({
+      id: row.id,
+      status: row.status,
+      claimantName: row.claimantName,
+      studentId: row.studentId,
+      createdAt: row.createdAt.toISOString(),
+    })),
+    matches,
   }
 }
 
@@ -692,30 +794,80 @@ export async function loadReturns(): Promise<ReturnRow[]> {
 }
 
 /**
- * Items that still need OSAS attention: open, with a claim or a match waiting.
- * Used for the dashboard's "waiting on OSAS" panel.
+ * Everything that is waiting on a person, as one queue (agents/UX.md §30 — the
+ * desk is where the workflow is moved along). Two things wait on OSAS:
+ *
+ *  - a claim filed by a student, awaiting verification
+ *  - an approved claim whose item is still on the shelf, awaiting hand-over
+ *
+ * Each entry carries the age of the wait, because a claim pending six days is a
+ * different problem from one filed this morning and a bare count hides that.
  */
-export async function loadAdminAttention(
-  viewer: Viewer,
-  limit = 6,
-): Promise<{
-  claims: ClaimListRow[]
-  matched: RecordRow[]
-}> {
-  const [claims, matched] = await Promise.all([
+export type AttentionEntry = {
+  kind: 'CLAIM' | 'RELEASE'
+  id: string
+  itemId: string
+  itemName: string
+  itemType: 'LOST' | 'FOUND'
+  photoUrl: string | null
+  /** Who is waiting: the claimant. */
+  personName: string
+  /** ISO timestamp the wait started — the claim date for both kinds. */
+  since: string
+}
+
+export async function loadAdminAttention(limit = 8): Promise<AttentionEntry[]> {
+  const [pendingClaims, awaitingRelease] = await Promise.all([
     prisma.claim.findMany({
       where: { status: 'PENDING' },
       orderBy: { createdAt: 'asc' },
       take: limit,
-      select: CLAIM_LIST_SELECT,
+      select: {
+        id: true,
+        claimantName: true,
+        createdAt: true,
+        item: { select: { id: true, name: true, type: true, imagePath: true } },
+      },
     }),
-    prisma.item.findMany({
-      where: { status: { in: ['CLAIM_PENDING'] } },
-      orderBy: { updatedAt: 'asc' },
+    // Approved, never released: the item is physically on the shelf and the
+    // claimant is waiting to be told to collect it.
+    prisma.claim.findMany({
+      where: { status: ClaimStatus.APPROVED, returns: { none: {} } },
+      orderBy: { decidedAt: 'asc' },
       take: limit,
-      select: RECORD_SELECT,
+      select: {
+        id: true,
+        claimantName: true,
+        decidedAt: true,
+        createdAt: true,
+        item: { select: { id: true, name: true, type: true, imagePath: true } },
+      },
     }),
   ])
 
-  return { claims: claims.map(toClaimRow), matched: matched.map((item) => toRecord(item, viewer)) }
+  const entries: AttentionEntry[] = [
+    ...pendingClaims.map((claim) => ({
+      kind: 'CLAIM' as const,
+      id: claim.id,
+      itemId: claim.item.id,
+      itemName: claim.item.name,
+      itemType: claim.item.type as 'LOST' | 'FOUND',
+      photoUrl: photoUrl(claim.item.imagePath),
+      personName: claim.claimantName,
+      since: claim.createdAt.toISOString(),
+    })),
+    ...awaitingRelease.map((claim) => ({
+      kind: 'RELEASE' as const,
+      id: claim.id,
+      itemId: claim.item.id,
+      itemName: claim.item.name,
+      itemType: claim.item.type as 'LOST' | 'FOUND',
+      photoUrl: photoUrl(claim.item.imagePath),
+      personName: claim.claimantName,
+      since: (claim.decidedAt ?? claim.createdAt).toISOString(),
+    })),
+  ]
+
+  // Longest wait first — the oldest problem is the one to pick up next.
+  return entries.sort((a, b) => a.since.localeCompare(b.since)).slice(0, limit)
 }
