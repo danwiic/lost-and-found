@@ -15,6 +15,9 @@ src/generated/
 uploads/
 .model-cache/
 
+# database dumps taken before a demo reset
+backups/
+
 # env
 .env
 .env.local
