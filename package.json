@@ -19,6 +19,7 @@
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "match:matrix": "node scripts/similarity-matrix.mjs",
+    "match:lab": "node scripts/matching-lab.mjs",
     "audit:contrast": "node scripts/contrast-audit.mjs",
     "audit:spacing": "node scripts/spacing-audit.mjs",
     "check:render": "node scripts/render-check.mjs",
