@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { LoginForm } from '@/components/auth/LoginForm'
+import { homeFor } from '@/components/shell/nav-items'
 import { readSession } from '@/lib/session'
 
 export const metadata: Metadata = {
@@ -10,7 +11,8 @@ export const metadata: Metadata = {
 
 export default async function LoginPage() {
   const user = await readSession()
-  if (user) redirect('/')
+  // Already signed in: staff go to their dashboard, students to their desk.
+  if (user) redirect(homeFor(user.role))
 
   return (
     <main className="w-full">

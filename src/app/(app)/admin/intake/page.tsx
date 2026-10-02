@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { ReportForm } from '@/components/report/ReportForm'
 import { buttonClass } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
@@ -25,15 +26,10 @@ export default async function AdminIntakePage() {
           Back to Dashboard
         </Link>
 
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-          Received at the OSAS office
-        </h1>
-        <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-          Log an item handed in at the counter. The finder&rsquo;s name and contact are recorded with
-          the report, so the chain of custody survives even when the record is filed under your
-          account. The photo is embedded and compared against open lost reports the moment you
-          record it.
-        </p>
+        <PageHeader
+          title="Received at the OSAS office"
+          description="Log what was handed in at the counter, and who found it."
+        />
       </div>
 
       <ReportForm type="FOUND" intake />

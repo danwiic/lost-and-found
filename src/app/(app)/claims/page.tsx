@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Badge'
 import { buttonClass } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -35,16 +36,10 @@ export default async function ClaimsPage() {
   return (
     <div className="page-stack">
       <header className="space-y-6">
-        <div>
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-            My Claims
-          </h1>
-          <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-            Claims you have filed and where each one stands. An approved claim is not a collected
-            item — the return is recorded at the OSAS office when the item is physically released to
-            you.
-          </p>
-        </div>
+        <PageHeader
+          title="My Claims"
+          description="Claims you have filed and where each one stands."
+        />
 
         {claims.length > 0 ? (
           <div className="border-t border-line pt-6">

@@ -31,8 +31,7 @@ export default async function ForgotPasswordPage() {
         <div className="card-pad rounded-lg border border-line bg-surface">
           <h1 className="text-2xl font-semibold tracking-tight">Reset your password</h1>
           <p className="measure mt-2 mb-6 text-sm text-ink-muted">
-            Answer the security questions you set up on your account and choose a new password. No
-            email is sent — the questions are the proof.
+            Answer your security questions, then choose a new password. No email is sent.
           </p>
           <ForgotPasswordForm />
         </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { MatchButton } from '@/components/records/MatchButton'
 import { Badge } from '@/components/ui/Badge'
 import { buttonClass } from '@/components/ui/Button'
@@ -54,16 +55,10 @@ export default async function MyReportsPage({
   return (
     <div className="page-stack">
       <header className="space-y-6">
-        <div>
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-            My Reports
-          </h1>
-          <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-            Everything you have reported, with its current state. A report marked Possible Match has
-            at least one item whose photo looks like yours — open it to compare before you claim
-            anything.
-          </p>
-        </div>
+        <PageHeader
+          title="My Reports"
+          description="Everything you have reported, with its current state."
+        />
 
         <div className="border-t border-line pt-6">
           <TallyLine

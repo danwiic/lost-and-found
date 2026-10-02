@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { PageContainer } from '@/components/layout/PageContainer'
 import { MobileNav } from '@/components/shell/MobileNav'
@@ -17,6 +18,12 @@ import { requireSession } from '@/lib/session'
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireSession()
+
+  // A temporary password issued at the counter ends here and nowhere else: no
+  // screen, no shell, no report form. The page outside this layout is the way
+  // out, and it is the only one.
+  if (user.mustChangePassword) redirect('/change-password')
+
   const unread = await prisma.notification.count({ where: { userId: user.id, read: false } })
 
   return (

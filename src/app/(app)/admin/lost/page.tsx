@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { AdminItemList, type AdminItemFilters } from '@/components/admin/AdminItemList'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { loadAdminItems } from '@/lib/records'
 import { requireAdminSession } from '@/lib/session'
 
@@ -33,15 +34,7 @@ export default async function AdminLostPage({
 
   return (
     <div className="page-stack">
-      <div>
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-          Lost Items
-        </h1>
-        <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-          Every item a student has reported missing. Open a record to see its candidates, its claims,
-          and the reporter&apos;s contact details.
-        </p>
-      </div>
+      <PageHeader title="Lost Items" description="Every item a student has reported missing." />
 
       <AdminItemList
         base="/admin/lost"

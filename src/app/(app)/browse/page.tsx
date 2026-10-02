@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { BrowseSearchTabs } from '@/components/records/BrowseSearchTabs'
 import { RecordGrid } from '@/components/records/RecordGrid'
 import { buttonClass } from '@/components/ui/Button'
@@ -90,14 +91,10 @@ export default async function BrowsePage({
 
   return (
     <div className="page-stack">
-      <div>
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-          Browse Items
-        </h1>
-        <p className="mt-2 text-sm text-ink-muted">
-          Browse reported lost &amp; found items.
-        </p>
-      </div>
+      <PageHeader
+        title="Browse Items"
+        description="Search every reported item by name, colour, place, or photo."
+      />
 
       {/* Search: text and photo as tabs of one area. The text side is a plain
           GET form that works before JavaScript loads; the photo side is the

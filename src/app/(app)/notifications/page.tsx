@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { NoticeList } from '@/components/dashboard/NoticeList'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { Panel, PanelHeading } from '@/components/ui/Panel'
 import { loadNotices } from '@/lib/dashboard'
 import { requireSession } from '@/lib/session'
@@ -14,13 +15,10 @@ export default async function NotificationsPage() {
   return (
     <div className="page-stack">
       <div>
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-          Notifications
-        </h1>
-        <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-          Possible matches, claim decisions and recorded returns. Opening a notice marks it as
-          read — a notice is never cleared just because this page was opened.
-        </p>
+        <PageHeader
+          title="Notifications"
+          description="Possible matches, claim decisions and recorded returns."
+        />
       </div>
 
       <Panel>

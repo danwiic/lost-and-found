@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LedgerList, Panel } from '@/components/ui/Panel'
 import { PhotoFrame } from '@/components/ui/PhotoFrame'
@@ -28,15 +29,7 @@ export default async function AdminReturnsPage() {
   return (
     <div className="page-stack">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-            Returns
-          </h1>
-          <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-            Every item OSAS has handed over, newest first, with the person it was released to and
-            whoever recorded it.
-          </p>
-        </div>
+        <PageHeader title="Returns" description="Every item OSAS has handed over, newest first." />
 
         <div className="border-t border-line pt-6">
           <TallyLine

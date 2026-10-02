@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { ReportForm } from '@/components/report/ReportForm'
 import { buttonClass } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
@@ -18,14 +19,10 @@ export default async function ReportFoundPage() {
           Back to Home
         </Link>
 
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-          Report Found Item
-        </h1>
-        <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-          Record what you found and where. Filing this report does not hand the item over — take the
-          physical item to the OSAS office. Whoever reported it lost is notified if the photos look
-          alike.
-        </p>
+        <PageHeader
+          title="Report Found Item"
+          description="What you found and where — then take the item to the OSAS office."
+        />
       </div>
 
       <ReportForm type="FOUND" />

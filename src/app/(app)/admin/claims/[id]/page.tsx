@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import { ClaimDecision } from '@/components/admin/ClaimDecision'
 import { ProofPhoto } from '@/components/admin/ProofPhoto'
 import { RecordReturn } from '@/components/admin/RecordReturn'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Badge'
 import { buttonClass } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
@@ -48,29 +49,16 @@ export default async function AdminClaimPage({
 
   return (
     <div className="page-stack">
-      <div>
-        <Link
-          href="/admin/claims"
-          className="inline-flex items-center gap-2 text-sm text-ink-muted transition-colors hover:text-ink"
-        >
-          <Icon name="arrow" className="h-4 w-4 rotate-180" />
-          All claims
-        </Link>
-
-        <div className="mt-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-          <div>
-            <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-              Verify Claim
-            </h1>
-            <p className="mt-3 text-[0.9375rem] text-ink-muted">
-              Filed by {claim.claimantName} {formatRelative(claim.createdAt)}.
-            </p>
-          </div>
+      <PageHeader
+        back={{ href: '/admin/claims', label: 'All claims' }}
+        title="Verify Claim"
+        description={`Filed by ${claim.claimantName} ${formatRelative(claim.createdAt)}.`}
+        action={
           <Badge tone={claimStatusTone(claim.status)} title={claimStatusMeaning(claim.status)}>
             {claimStatusLabel(claim.status)}
           </Badge>
-        </div>
-      </div>
+        }
+      />
 
       {open ? (
         <div className="rounded-lg border border-line bg-surface px-6 py-4 sm:px-6">

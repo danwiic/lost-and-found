@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { MatchDecision } from '@/components/admin/MatchDecision'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { MatchButton } from '@/components/records/MatchButton'
 import { Badge } from '@/components/ui/Badge'
 import { buttonClass } from '@/components/ui/Button'
@@ -45,15 +46,10 @@ export default async function AdminPage() {
   return (
     <div className="page-stack">
       <header className="space-y-6">
-        <div>
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-            Dashboard
-          </h1>
-          <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-            Every report on the system, the claims waiting to be verified, and the returns already
-            recorded. Matching suggests a candidate; this is where a person decides.
-          </p>
-        </div>
+        <PageHeader
+          title="Dashboard"
+          description="What is waiting on OSAS, and where every record stands."
+        />
 
         <div className="border-t border-line pt-6">
           <TallyLine

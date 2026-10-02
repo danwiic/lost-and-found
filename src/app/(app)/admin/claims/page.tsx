@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Badge'
 import { buttonClass } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -60,14 +61,10 @@ export default async function AdminClaimsPage({
   return (
     <div className="page-stack">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">Claims</h1>
-          <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-            Every claim a student has filed. Open one to read the proof of ownership, check it
-            against the item, and record your decision. Nothing is released until the return is
-            recorded separately.
-          </p>
-        </div>
+        <PageHeader
+          title="Claims"
+          description="Every claim a student has filed, oldest first."
+        />
 
         <div className="border-t border-line pt-6">
           <TallyLine

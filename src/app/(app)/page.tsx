@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { NoticeList } from '@/components/dashboard/NoticeList'
 import { RecordLedger } from '@/components/dashboard/RecordLedger'
 import { RecoveryPrompt } from '@/components/dashboard/RecoveryPrompt'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { buttonClass } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { Panel, PanelHeading } from '@/components/ui/Panel'
@@ -45,22 +46,17 @@ export default async function HomePage() {
 
   const situation =
     confirmedWaiting > 0
-      ? 'OSAS checked the resemblance and confirmed the two records are the same item. Ownership is still proved through a claim — file it with what only the owner would know.'
+      ? 'OSAS confirmed the match. File a claim — proof of ownership is what releases an item.'
       : matchesWaiting > 0
-        ? 'The matching system found items that look like something you reported. Similarity is a lead, not proof — open the photos and claim only what is yours.'
+        ? 'Items resembling your reports are waiting. Similarity is a lead, not proof.'
         : approvedWaiting > 0
-          ? 'OSAS verified your claim. Bring your student ID to the OSAS office to collect the item; the return is recorded when it is released.'
-          : 'Report what you lost, or what you found and turned in. A new report is compared against open items of the opposite type as soon as its photo arrives.'
+          ? 'OSAS verified your claim. Bring your student ID to the office to collect it.'
+          : 'Report what you lost, or what you found — the photo does the matching.'
 
   return (
     <div className="page-stack">
-      <header className="space-y-6">
-        <div>
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-            {headline}
-          </h1>
-          <p className="measure mt-3 text-[0.9375rem] text-ink-muted">{situation}</p>
-        </div>
+      <div className="space-y-6">
+        <PageHeader title={headline} description={situation} />
 
         <div className="flex flex-wrap items-center gap-3">
           <Link href="/report/lost" className={buttonClass({ variant: 'primary' })}>
@@ -93,9 +89,7 @@ export default async function HomePage() {
             ]}
           />
         </div>
-      </header>
-
-      {data.showRecoveryPrompt ? <RecoveryPrompt /> : null}
+      </div>
 
       <Panel>
         <PanelHeading
@@ -119,6 +113,10 @@ export default async function HomePage() {
         />
         <RecordLedger records={data.records} claims={data.claims} />
       </Panel>
+
+      {/* Last, not first: setting up recovery is an aside, and putting it above
+          "Waiting on you" pushed the page's actual purpose below the fold. */}
+      {data.showRecoveryPrompt ? <RecoveryPrompt /> : null}
     </div>
   )
 }

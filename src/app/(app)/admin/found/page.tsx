@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { AdminItemList, type AdminItemFilters } from '@/components/admin/AdminItemList'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { loadAdminItems } from '@/lib/records'
 import { requireAdminSession } from '@/lib/session'
 
@@ -33,15 +34,7 @@ export default async function AdminFoundPage({
 
   return (
     <div className="page-stack">
-      <div>
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-          Found Items
-        </h1>
-        <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-          Everything handed in or picked up and logged by OSAS. The status tells you whether it is
-          still on the shelf, held for a claim, or already released.
-        </p>
-      </div>
+      <PageHeader title="Found Items" description="Everything handed in and logged by OSAS." />
 
       <AdminItemList
         base="/admin/found"

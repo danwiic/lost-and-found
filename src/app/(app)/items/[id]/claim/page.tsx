@@ -1,12 +1,10 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ClaimForm } from '@/components/claims/ClaimForm'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Badge'
-import { buttonClass } from '@/components/ui/Button'
 import { Panel } from '@/components/ui/Panel'
 import { PhotoFrame } from '@/components/ui/PhotoFrame'
-import { Icon } from '@/components/ui/Icon'
 import { formatDate, itemTypeLabel } from '@/lib/format'
 import { loadItem } from '@/lib/records'
 import { requireSession } from '@/lib/session'
@@ -33,23 +31,11 @@ export default async function ClaimPage({ params }: Props) {
 
   return (
     <div className="page-stack">
-      <div>
-        <Link
-          href={`/items/${item.id}`}
-          className={`mb-6 ${buttonClass({ variant: 'quiet', size: 'sm' })}`}
-        >
-          <Icon name="arrow" className="h-4 w-4 rotate-180" />
-          Back to the item
-        </Link>
-
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-          Submit a Claim
-        </h1>
-        <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-          Tell OSAS why this item is yours. They verify every claim in person before anything is
-          released, so be specific — vague claims are the ones that get rejected.
-        </p>
-      </div>
+      <PageHeader
+        back={{ href: `/items/${item.id}`, label: 'Back to the item' }}
+        title="Submit a Claim"
+        description="Why this item is yours — OSAS verifies every claim in person."
+      />
 
       {/* Review before submit (§10.1). */}
       <Panel className="card-pad">

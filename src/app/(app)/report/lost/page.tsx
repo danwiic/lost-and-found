@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { ReportForm } from '@/components/report/ReportForm'
 import { buttonClass } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
@@ -21,14 +22,10 @@ export default async function ReportLostPage() {
           Back to Home
         </Link>
 
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">
-          Report Lost Item
-        </h1>
-        <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-          Tell us what you lost and where. The photo is the important part: as soon as the report is
-          submitted, it is compared against open found items and you are told about anything that
-          looks similar.
-        </p>
+        <PageHeader
+          title="Report Lost Item"
+          description="What you lost and where — the photo is compared against found items."
+        />
       </div>
 
       <ReportForm type="LOST" />

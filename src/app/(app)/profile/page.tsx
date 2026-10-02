@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { ChangePasswordForm } from '@/components/auth/ChangePasswordForm'
 import { RecoverySection } from '@/components/auth/RecoverySection'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { SignOutButton } from '@/components/shell/SignOutButton'
 import { Badge } from '@/components/ui/Badge'
 import { buttonClass } from '@/components/ui/Button'
@@ -17,9 +19,9 @@ export const metadata: Metadata = { title: 'Profile — Lost and Found' }
  * would be inventing a capability that does not exist (agents/UX.md §31.5).
  * Name, ID and contact are still corrected at the OSAS office.
  *
- * Account recovery is the exception, and deliberately so — the questions are
- * the only thing a person can change here, because they are self-service by
- * definition: waiting at the counter for them would defeat their purpose.
+ * Two things a person can change here — their password and their recovery
+ * questions — and both are self-service by definition: waiting at the counter
+ * for either would defeat the point of having them.
  */
 export default async function ProfilePage() {
   const user = await requireSession('/profile')
@@ -33,11 +35,7 @@ export default async function ProfilePage() {
   return (
     <div className="page-stack">
       <div>
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight sm:text-3xl">Profile</h1>
-        <p className="measure mt-3 text-[0.9375rem] text-ink-muted">
-          The details OSAS has on your account. These are what a claim is verified against, so keep
-          them accurate.
-        </p>
+        <PageHeader title="Profile" description="The details OSAS has on your account." />
       </div>
 
       <Panel>
@@ -61,6 +59,16 @@ export default async function ProfilePage() {
             missing="Not on file — OSAS needs one to reach you about a collection."
           />
         </dl>
+      </Panel>
+
+      <Panel>
+        <PanelHeading
+          title="Password"
+          description="Change the one you sign in with. Every other device is signed out when you do."
+        />
+        <div className="px-6 py-6 sm:px-6">
+          <ChangePasswordForm role={user.role} />
+        </div>
       </Panel>
 
       <div id="recovery" className="scroll-mt-24">
