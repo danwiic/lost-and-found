@@ -21,6 +21,7 @@
     "match:matrix": "node scripts/similarity-matrix.mjs",
     "match:lab": "node scripts/matching-lab.mjs",
     "audit:contrast": "node scripts/contrast-audit.mjs",
+    "audit:headers": "node scripts/header-audit.mjs",
     "audit:spacing": "node scripts/spacing-audit.mjs",
     "check:render": "node scripts/render-check.mjs",
     "check:photo-search": "node scripts/photo-search-check.mjs",

@@ -71,6 +71,9 @@ model User {
   recoveryLockedUntil   DateTime?
   /// When the "set up account recovery" prompt was last dismissed.
   recoveryPromptHiddenAt DateTime?
+  /// Set when OSAS issues a temporary password at the counter. Every screen but
+  /// the password change steps aside until the owner chooses their own.
+  mustChangePassword     Boolean   @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -82,6 +85,7 @@ model User {
   releases        ReturnRecord[]   @relation("ReleasedBy")
   securityAnswers SecurityAnswer[]
   passwordResets  PasswordReset[]
+  resetsIssued    PasswordReset[]  @relation("PasswordResetActor")
 }
 
 /// One hashed answer per question. The answer is stored the way a password is:
@@ -101,16 +105,29 @@ model SecurityAnswer {
   @@index([userId])
 }
 
-/// An append-only record that a password was reset through the questions, kept
-/// apart from the notification so the history survives the notice being read.
-model PasswordReset {
-  id        String   @id @default(cuid())
-  userId    String
-  createdAt DateTime @default(now())
+enum PasswordResetMethod {
+  /// The account holder answered their own security questions.
+  QUESTIONS
+  /// OSAS issued a temporary password at the counter.
+  STAFF
+}
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+/// An append-only record that a password was reset, kept apart from the
+/// notification so the history survives the notice being read. Staff-issued
+/// resets name the person who issued them: the counter needs someone to ask.
+model PasswordReset {
+  id        String              @id @default(cuid())
+  userId    String
+  method    PasswordResetMethod @default(QUESTIONS)
+  /// The staff member who issued a temporary password; null for self-service.
+  actorId   String?
+  createdAt DateTime            @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("PasswordResetActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
+  @@index([actorId])
 }
 
 model Item {
