@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
+import { PasswordInput } from '@/components/auth/PasswordInput'
 import { buttonClass, Spinner } from '@/components/ui/Button'
 import { ErrorNote } from '@/components/ui/EmptyState'
 import { Field, inputClass } from '@/components/ui/Field'
@@ -11,6 +12,7 @@ type FieldErrors = {
   name?: string
   email?: string
   password?: string
+  confirmPassword?: string
   studentId?: string
   contact?: string
 }
@@ -28,7 +30,9 @@ const PASSWORD_MAX = 200
  * Creates a student account. The API signs the new account in straight away, so
  * a successful registration lands on the desk rather than back at a sign-in
  * form. Validation is per-field and happens on blur and on submit — never while
- * the user is still typing (agents/UX.md §5.4).
+ * the user is still typing (agents/UX.md §5.4). The six fields are split into
+ * three labelled sections so the form reads as shorter than it is, and the
+ * optional half is named as optional up front.
  */
 export function RegisterForm() {
   const router = useRouter()
@@ -37,6 +41,7 @@ export function RegisterForm() {
     name: '',
     email: '',
     password: '',
+    confirmPassword: '',
     studentId: '',
     contact: '',
   })
@@ -46,6 +51,13 @@ export function RegisterForm() {
 
   function set(field: keyof typeof values) {
     return (value: string) => setValues((current) => ({ ...current, [field]: value }))
+  }
+
+  /** Editing a field clears its message; the problem is re-checked on blur. */
+  function clear(field: keyof FieldErrors) {
+    setErrors((current) =>
+      current[field] === undefined ? current : { ...current, [field]: undefined },
+    )
   }
 
   function validateOne(field: keyof FieldErrors): string | undefined {
@@ -71,12 +83,17 @@ export function RegisterForm() {
       }
       return undefined
     }
+    if (field === 'confirmPassword') {
+      if (!values.confirmPassword) return 'Re-enter your password.'
+      if (values.confirmPassword !== values.password) return 'Passwords do not match.'
+      return undefined
+    }
     return undefined
   }
 
   function validate(): FieldErrors {
     const found: FieldErrors = {}
-    for (const field of ['name', 'email', 'password'] as const) {
+    for (const field of ['name', 'email', 'password', 'confirmPassword'] as const) {
       const problem = validateOne(field)
       if (problem) found[field] = problem
     }
@@ -84,7 +101,7 @@ export function RegisterForm() {
   }
 
   /** Validate a single field once it loses focus, and only if it has content. */
-  function onBlur(field: 'name' | 'email' | 'password') {
+  function onBlur(field: 'name' | 'email' | 'password' | 'confirmPassword') {
     return () => {
       const problem = validateOne(field)
       setErrors((current) => ({ ...current, [field]: problem }))
@@ -114,6 +131,7 @@ export function RegisterForm() {
           name: values.name.trim(),
           email: values.email.trim(),
           password: values.password,
+          confirmPassword: values.confirmPassword,
           ...(values.studentId.trim() ? { studentId: values.studentId.trim() } : {}),
           ...(values.contact.trim() ? { contact: values.contact.trim() } : {}),
         }),
@@ -126,6 +144,10 @@ export function RegisterForm() {
         if (fields.length > 0) {
           setErrors(failure.fields as FieldErrors)
           document.getElementById(fields[0])?.focus()
+        } else if (failure.status === 409) {
+          // "That email already has an account" points at the email field.
+          setErrors({ email: failure.message })
+          document.getElementById('email')?.focus()
         } else {
           setFormError(failure.message)
         }
@@ -143,106 +165,172 @@ export function RegisterForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="space-y-6">
+    <form onSubmit={onSubmit} noValidate className="space-y-8">
       {formError ? <ErrorNote>{formError}</ErrorNote> : null}
 
-      <Field id="name" label="Full name" error={errors.name}>
-        {(props) => (
-          <input
-            {...props}
-            type="text"
-            name="name"
-            autoComplete="name"
-            maxLength={NAME_MAX}
-            value={values.name}
-            onChange={(event) => set('name')(event.target.value)}
-            onBlur={onBlur('name')}
-            className={inputClass({ invalid: Boolean(errors.name) })}
-          />
-        )}
-      </Field>
+      <section className="space-y-6">
+        <h2 className="text-base font-semibold">Your account</h2>
 
-      <Field
-        id="email"
-        label="Email address"
-        hint="This is how OSAS reaches you about a claim."
-        error={errors.email}
-      >
-        {(props) => (
-          <input
-            {...props}
-            type="email"
-            name="email"
-            autoComplete="email"
-            maxLength={254}
-            value={values.email}
-            onChange={(event) => set('email')(event.target.value)}
-            onBlur={onBlur('email')}
-            className={inputClass({ invalid: Boolean(errors.email) })}
-          />
-        )}
-      </Field>
+        <Field id="name" label="Full name" error={errors.name}>
+          {props => (
+            <input
+              {...props}
+              type="text"
+              name="name"
+              autoComplete="name"
+              maxLength={NAME_MAX}
+              placeholder="Juan Dela Cruz"
+              value={values.name}
+              onChange={event => {
+                set('name')(event.target.value)
+                clear('name')
+              }}
+              onBlur={onBlur('name')}
+              className={inputClass({ invalid: Boolean(errors.name) })}
+            />
+          )}
+        </Field>
 
-      <Field
-        id="password"
-        label="Password"
-        hint={`At least ${PASSWORD_MIN} characters.`}
-        error={errors.password}
-      >
-        {(props) => (
-          <input
-            {...props}
-            type="password"
-            name="password"
-            autoComplete="new-password"
-            maxLength={PASSWORD_MAX}
-            value={values.password}
-            onChange={(event) => set('password')(event.target.value)}
-            onBlur={onBlur('password')}
-            className={inputClass({ invalid: Boolean(errors.password) })}
-          />
-        )}
-      </Field>
+        <Field
+          id="email"
+          label="Email address"
+          hint="This is how OSAS reaches you about a claim."
+          error={errors.email}
+        >
+          {props => (
+            <input
+              {...props}
+              type="email"
+              name="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              maxLength={254}
+              placeholder="you@cvsu.edu.ph"
+              value={values.email}
+              onChange={event => {
+                set('email')(event.target.value)
+                clear('email')
+              }}
+              onBlur={onBlur('email')}
+              className={inputClass({ invalid: Boolean(errors.email) })}
+            />
+          )}
+        </Field>
+      </section>
 
-      <Field
-        id="studentId"
-        label="Student / personnel ID"
-        optionalHint="Optional"
-        error={errors.studentId}
-      >
-        {(props) => (
-          <input
-            {...props}
-            type="text"
-            name="studentId"
-            maxLength={STUDENT_ID_MAX}
-            value={values.studentId}
-            onChange={(event) => set('studentId')(event.target.value)}
-            className={inputClass({ invalid: Boolean(errors.studentId) })}
-          />
-        )}
-      </Field>
+      <section className="space-y-6 border-t border-line pt-8">
+        <h2 className="text-base font-semibold">Choose a password</h2>
 
-      <Field
-        id="contact"
-        label="Contact number"
-        optionalHint="Optional"
-        hint="Used on a claim so OSAS can reach you about collection."
-        error={errors.contact}
-      >
-        {(props) => (
-          <input
-            {...props}
-            type="tel"
-            name="contact"
-            autoComplete="tel"
-            maxLength={CONTACT_MAX}
-            value={values.contact}
-            onChange={(event) => set('contact')(event.target.value)}
-            className={inputClass({ invalid: Boolean(errors.contact) })}
-          />
-        )}
-      </Field>
+        <Field
+          id="password"
+          label="Password"
+          hint={`At least ${PASSWORD_MIN} characters.`}
+          error={errors.password}
+        >
+          {props => (
+            <PasswordInput
+              {...props}
+              name="password"
+              value={values.password}
+              onChange={value => {
+                set('password')(value)
+                clear('password')
+                // A confirmation problem the user can already see keeps up with
+                // the password instead of waiting for the next blur.
+                if (values.confirmPassword) {
+                  setErrors(current => ({
+                    ...current,
+                    confirmPassword:
+                      value === values.confirmPassword ? undefined : 'Passwords do not match.',
+                  }))
+                }
+              }}
+              onBlur={onBlur('password')}
+              autoComplete="new-password"
+              maxLength={PASSWORD_MAX}
+              placeholder={`At least ${PASSWORD_MIN} characters`}
+              invalid={Boolean(errors.password)}
+            />
+          )}
+        </Field>
+
+        <Field id="confirmPassword" label="Confirm password" error={errors.confirmPassword}>
+          {props => (
+            <PasswordInput
+              {...props}
+              name="confirmPassword"
+              value={values.confirmPassword}
+              onChange={value => {
+                set('confirmPassword')(value)
+                clear('confirmPassword')
+              }}
+              onBlur={onBlur('confirmPassword')}
+              autoComplete="new-password"
+              maxLength={PASSWORD_MAX}
+              placeholder="Re-enter your password"
+              invalid={Boolean(errors.confirmPassword)}
+            />
+          )}
+        </Field>
+      </section>
+
+      <section className="space-y-6 border-t border-line pt-8">
+        <div>
+          <h2 className="text-base font-semibold">Details OSAS may need</h2>
+          <p className="mt-1 text-xs text-ink-muted">
+            Optional — they make a claim faster to verify and to schedule a collection.
+          </p>
+        </div>
+
+        <Field
+          id="studentId"
+          label="Student / personnel ID"
+          optionalHint="Optional"
+          error={errors.studentId}
+        >
+          {props => (
+            <input
+              {...props}
+              type="text"
+              name="studentId"
+              maxLength={STUDENT_ID_MAX}
+              placeholder="202212345"
+              value={values.studentId}
+              onChange={event => {
+                set('studentId')(event.target.value)
+                clear('studentId')
+              }}
+              className={inputClass({ invalid: Boolean(errors.studentId) })}
+            />
+          )}
+        </Field>
+
+        <Field
+          id="contact"
+          label="Contact number"
+          optionalHint="Optional"
+          hint="Used on a claim so OSAS can reach you about collection."
+          error={errors.contact}
+        >
+          {props => (
+            <input
+              {...props}
+              type="tel"
+              name="contact"
+              autoComplete="tel"
+              maxLength={CONTACT_MAX}
+              placeholder="0917 000 0000"
+              value={values.contact}
+              onChange={event => {
+                set('contact')(event.target.value)
+                clear('contact')
+              }}
+              className={inputClass({ invalid: Boolean(errors.contact) })}
+            />
+          )}
+        </Field>
+      </section>
 
       <button
         type="submit"

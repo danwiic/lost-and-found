@@ -1,7 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
+import { PasswordInput } from '@/components/auth/PasswordInput'
 import { buttonClass, Spinner } from '@/components/ui/Button'
 import { ErrorNote } from '@/components/ui/EmptyState'
 import { Field, inputClass } from '@/components/ui/Field'
@@ -10,6 +12,13 @@ type FieldErrors = { email?: string; password?: string }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
+/**
+ * Sign in. Field problems are checked on blur and on submit — never while the
+ * user is still typing — and editing a field clears its message so a fixed
+ * problem does not keep staring back (agents/UX.md §5.4). A failed sign-in
+ * stays a form-level message: the API deliberately refuses to say which half of
+ * the pair was wrong.
+ */
 export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -21,26 +30,38 @@ export function LoginForm() {
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  function validate(): FieldErrors {
-    const found: FieldErrors = {}
-    const trimmed = email.trim()
+  function validateOne(field: keyof FieldErrors): string | undefined {
+    if (field === 'email') {
+      const trimmed = email.trim()
+      if (!trimmed) return 'Enter the email address on your account.'
+      if (!EMAIL_PATTERN.test(trimmed)) return 'That does not look like an email address.'
+      return undefined
+    }
+    if (!password) return 'Enter your password.'
+    return undefined
+  }
 
-    if (!trimmed) found.email = 'Enter the email address on your account.'
-    else if (!EMAIL_PATTERN.test(trimmed)) found.email = 'That does not look like an email address.'
-
-    if (!password) found.password = 'Enter your password.'
-
-    return found
+  function onBlur(field: keyof FieldErrors) {
+    return () => setErrors((current) => ({ ...current, [field]: validateOne(field) }))
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting) return // no duplicate submissions
 
-    const found = validate()
+    const found: FieldErrors = {}
+    for (const field of ['email', 'password'] as const) {
+      const problem = validateOne(field)
+      if (problem) found[field] = problem
+    }
     setErrors(found)
     setFormError(null)
-    if (Object.keys(found).length > 0) return
+
+    const firstInvalid = (['email', 'password'] as const).find((field) => found[field])
+    if (firstInvalid) {
+      document.getElementById(firstInvalid)?.focus()
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -79,27 +100,50 @@ export function LoginForm() {
             type="email"
             name="email"
             autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={254}
+            placeholder="you@cvsu.edu.ph"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => {
+              setEmail(event.target.value)
+              if (errors.email) setErrors((current) => ({ ...current, email: undefined }))
+            }}
+            onBlur={onBlur('email')}
             className={inputClass({ invalid: Boolean(errors.email) })}
           />
         )}
       </Field>
 
-      <Field id="password" label="Password" error={errors.password}>
-        {(props) => (
-          <input
-            {...props}
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            maxLength={200}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className={inputClass({ invalid: Boolean(errors.password) })}
-          />
-        )}
-      </Field>
+      <div className="space-y-3">
+        <Field id="password" label="Password" error={errors.password}>
+          {(props) => (
+            <PasswordInput
+              {...props}
+              name="password"
+              value={password}
+              onChange={(value) => {
+                setPassword(value)
+                if (errors.password) setErrors((current) => ({ ...current, password: undefined }))
+              }}
+              onBlur={onBlur('password')}
+              autoComplete="current-password"
+              maxLength={200}
+              placeholder="Your password"
+              invalid={Boolean(errors.password)}
+            />
+          )}
+        </Field>
+
+        <div className="flex justify-end">
+          <Link
+            href="/forgot-password"
+            className="text-sm font-medium text-accent hover:underline"
+          >
+            Forgot your password?
+          </Link>
+        </div>
+      </div>
 
       <button
         type="submit"
