@@ -62,11 +62,10 @@ Confirmed, and backed by implemented endpoints:
 - Report a lost item and report a found item, each with a required photo, name, description,
   colour, relevant date, location, and optional extra details.
 - Automatic image matching on report, with a similarity score and a stored match, returned to the
-  reporter so the candidates appear on their confirmation. The stored notification goes to the
-  **lost side** of the pair in both arrival orders: report a found item and the owner of the
-  matching lost report is notified; report a lost item that matches a found item already on file
-  and the reporter is notified, so the candidates outlive the confirmation screen. A finder is
-  never sent a possible-match notice.
+  reporter so the candidates appear on their confirmation. The stored notification goes to
+  **both owners** of the pair, in either arrival order — a finder hears about a match too — and
+  each notice points at the other report, so opening it shows the item that matched rather than
+  the one the reader already knows about.
 - Browse and search items by type, status, colour and free text; reports, matches and claims are
   visible to their owner and to OSAS staff.
 - Submit a claim (claimant name, student or personnel ID, contact, extra item details, proof of
