@@ -59,7 +59,9 @@ const FILES = [
   { name: '0_CLIPModel/tokenizer.json', size: 2224003 },
   { name: '0_CLIPModel/tokenizer_config.json', size: 733 },
   { name: '0_CLIPModel/vocab.json', size: 862328 },
-  { name: 'README.md', size: 1912 },
+  // Model card, not read by SentenceTransformer: kept in the list so a fetched
+  // cache is a full copy of the revision, but never a hard failure (see `doc`).
+  { name: 'README.md', size: 1912, doc: true },
   { name: 'config_sentence_transformers.json', size: 118 },
   { name: 'modules.json', size: 122 },
 ]
@@ -163,6 +165,10 @@ async function main() {
         continue
       }
       if (size !== entry.size) {
+        if (entry.doc) {
+          console.log(`[model] note     ${entry.name}: local copy differs from upstream (not loaded — harmless)`)
+          continue
+        }
         problems.push(`${entry.name}: ${size} bytes, expected ${entry.size}`)
         console.log(`[model] BAD SIZE ${entry.name} (${size} bytes)`)
         continue

@@ -30,6 +30,9 @@ backups/
 .DS_Store
 Thumbs.db
 *.log
-npm-debug.log*# model cache (1.7 GB — never committed; fetch per machine with: npm run model:fetch)
-embedder/model-cache/*
-!embedder/model-cache/.gitkeep
+npm-debug.log*
+
+
+# model cache — 1.7 GB, never committed; fetch per machine with: npm run model:fetch
+embedder/model-cache/*
+!embedder/model-cache/README.md
