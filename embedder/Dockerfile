@@ -38,7 +38,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # with the command to run rather than a bare "not found" from the COPY below.
 RUN --mount=type=bind,source=model-cache,target=/src/model-cache \
     test -s /src/model-cache/clip-ViT-L-14/0_CLIPModel/model.safetensors \
-      || { echo "embedder/model-cache is empty — run 'npm run model:fetch' on the host first (see README)."; exit 1; }
+    || { echo "embedder/model-cache is empty — run 'npm run model:fetch' on the host first (see README)."; exit 1; }
 
 COPY model-cache/clip-ViT-L-14 /srv/models/clip-ViT-L-14
 
