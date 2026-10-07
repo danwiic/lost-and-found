@@ -10,6 +10,7 @@ The whole system runs locally with one command. No cloud services, no external A
 
 ```bash
 cp .env.example .env
+npm run model:fetch           # once per machine: the 1.7 GB CLIP weights (not in git)
 docker compose up --build
 # open http://localhost:3000
 ```
@@ -126,7 +127,8 @@ number it always did.
 
 The model is **baked into the embedder image at build time** from `embedder/model-cache/`
 (pinned HuggingFace revision) — the container downloads nothing at runtime, so matching works
-offline. Keep that folder on disk; it is part of the build context.
+offline. It is not in git — `npm run model:fetch` puts it in the build context (see
+"With Docker Compose").
 
 ---
 
@@ -136,6 +138,7 @@ offline. Keep that folder on disk; it is part of the build context.
 
 ```bash
 cp .env.example .env          # AUTH_SECRET must be changed from the placeholder
+npm run model:fetch           # once per machine — see "The model" below
 docker compose up --build
 ```
 
@@ -149,6 +152,15 @@ Three containers:
 
 `app` waits for both healthchecks before starting. Photos and database data live in named
 volumes (`uploads`, `pgdata`) and survive `docker compose down`.
+
+**The model.** 1.7 GB of CLIP weights are copied into the embedder image at build time (so the
+container never downloads anything at runtime), and they are deliberately **not in git**. Fetch
+them once per machine before the first build, or the embedder image fails to build:
+
+```bash
+npm run model:fetch              # pinned HuggingFace revision, sha256-checked
+npm run model:fetch -- --check   # verify an existing copy, download nothing
+```
 
 To browse the embedder's API docs (`/docs`, `/redoc`, `/openapi.json`), opt in:
 
@@ -164,6 +176,7 @@ The database and the embedder still run in containers; only the Next.js app runs
 ```bash
 docker run -d --name laf-pg -e POSTGRES_USER=lostfound -e POSTGRES_PASSWORD=lostfound \
   -e POSTGRES_DB=lostfound -p 5433:5432 pgvector/pgvector:pg16
+npm run model:fetch          # the embedder image needs the weights in its build context
 docker compose build embedder
 docker run -d --name laf-embedder -p 8000:8000 lost-and-found-embedder
 
@@ -294,7 +307,7 @@ to signed-in users; dates cannot be in the future and a return cannot precede it
 ├── embedder/
 │   ├── main.py                # FastAPI: /embed, /health (+ /docs behind compose.docs.yml)
 │   ├── Dockerfile             # model baked at build, pinned HF revision
-│   └── model-cache/clip-ViT-L-14/   # keep on disk — part of the build context
+│   └── model-cache/           # build context for the weights; npm run model:fetch
 ├── scripts/                   # verification suites, audits, and the demo reset
 ├── src/
 │   ├── app/
