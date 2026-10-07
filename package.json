@@ -19,6 +19,7 @@
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "demo:reset": "node scripts/clear-demo-data.mjs",
+    "model:fetch": "node scripts/fetch-embedder-model.mjs",
     "match:matrix": "node scripts/similarity-matrix.mjs",
     "match:lab": "node scripts/matching-lab.mjs",
     "audit:contrast": "node scripts/contrast-audit.mjs",

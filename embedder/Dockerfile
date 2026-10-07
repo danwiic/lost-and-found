@@ -32,6 +32,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Bake the model into the image: copied from the build context, never
 # downloaded. This layer changes rarely — keep it above the app code copy.
+#
+# model-cache/ is gitignored, so a fresh clone has the folder but no weights.
+# Checked through a bind mount (no layer of its own) so a missing fetch fails
+# with the command to run rather than a bare "not found" from the COPY below.
+RUN --mount=type=bind,source=model-cache,target=/src/model-cache \
+    test -s /src/model-cache/clip-ViT-L-14/0_CLIPModel/model.safetensors \
+      || { echo "embedder/model-cache is empty — run 'npm run model:fetch' on the host first (see README)."; exit 1; }
+
 COPY model-cache/clip-ViT-L-14 /srv/models/clip-ViT-L-14
 
 COPY main.py .
