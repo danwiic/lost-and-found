@@ -6,3 +6,8 @@
 *.jpg binary
 *.webp binary
 *.onnx binary
+# Model weights: `* text=auto` would CRLF-convert them byte for byte and
+# silently corrupt the tensors, so they are binary whatever else says.
+*.safetensors binary
+*.bin binary
+*.pt binary
