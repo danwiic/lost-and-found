@@ -34,5 +34,5 @@ npm-debug.log*
 
 
 # model cache — 1.7 GB, never committed; fetch per machine with: npm run model:fetch
-embedder/model-cache/*
+embedder/model-cache/
 !embedder/model-cache/README.md
