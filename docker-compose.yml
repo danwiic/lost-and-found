@@ -1,24 +1,4 @@
 services:
-  # Internal-only image-matching sidecar: clip-ViT-L/14 behind POST /embed.
-  # No host port is published — the app reaches it at http://embedder:8000 and
-  # nothing else can. The model is baked into its image at build time.
-  embedder:
-    build: ./embedder
-    restart: unless-stopped
-    environment:
-      EMBEDDER_API_KEY: ${EMBEDDER_API_KEY:-}
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
-      interval: 10s
-      timeout: 10s
-      retries: 12
-      # The model (1.7 GB) loads once at boot; give it room before failing.
-      start_period: 120s
-
   db:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
@@ -40,9 +20,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      # Photo matching is dead without it, so the app waits for the model.
-      embedder:
-        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-lostfound}:${POSTGRES_PASSWORD:-lostfound}@db:5432/${POSTGRES_DB:-lostfound}
       AUTH_SECRET: ${AUTH_SECRET:-change-me-in-env}
@@ -51,8 +28,8 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-0}
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-8}
-      EMBEDDER_URL: ${EMBEDDER_URL:-http://embedder:8000}
-      EMBEDDER_API_KEY: ${EMBEDDER_API_KEY:-}
+      EMBEDDER_URL: ${EMBEDDER_URL:?Set EMBEDDER_URL in .env}
+      EMBEDDER_API_KEY: ${EMBEDDER_API_KEY:?Set EMBEDDER_API_KEY in .env}
       # Scores are calibrated (raw cosine minus baseline, rescaled to 0-1)
       # before they are thresholded or shown. Tune both from the raw=/calibrated=
       # pairs in the [match] and [photo-search] log lines.

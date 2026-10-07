@@ -6,14 +6,19 @@ matching, and both sides are notified of a possible match. OSAS staff verify cla
 proof of ownership and record the physical hand-over — approval and release are separate,
 recorded events.
 
-The whole system runs locally with one command. No cloud services, no external APIs.
+The app and database run locally with one command. The CLIP embedder runs as a
+separate HTTPS service and is configured through `.env`.
 
 ```bash
 cp .env.example .env
-npm run model:fetch           # once per machine: the 1.7 GB CLIP weights (not in git)
 docker compose up --build
 # open http://localhost:3000
 ```
+
+Set `EMBEDDER_URL` to the deployed embedder domain and `EMBEDDER_API_KEY` to
+the same key configured on that service before starting Compose. The local
+Compose stack runs only the Next.js app and PostgreSQL; it does not download or
+build the 1.7 GB model.
 
 The seed creates exactly one account — the OSAS admin (`admin@cvsu.test` / `admin123`).
 Students register themselves, and every item in the system comes from a real report.
@@ -125,10 +130,9 @@ page, or a report's confirmation) and each reading shows the raw cosine and the 
 next to the threshold and baseline. Without the flag the interface shows only the calibrated
 number it always did.
 
-The model is **baked into the embedder image at build time** from `embedder/model-cache/`
-(pinned HuggingFace revision) — the container downloads nothing at runtime, so matching works
-offline. It is not in git — `npm run model:fetch` puts it in the build context (see
-"With Docker Compose").
+The model is **baked into the separately deployed embedder image at build time** from
+`embedder/model-cache/` (pinned HuggingFace revision). The local app does not download or
+build the model; it calls the configured HTTPS embedder service.
 
 ---
 
@@ -138,51 +142,32 @@ offline. It is not in git — `npm run model:fetch` puts it in the build context
 
 ```bash
 cp .env.example .env          # AUTH_SECRET must be changed from the placeholder
-npm run model:fetch           # once per machine — see "The model" below
 docker compose up --build
 ```
 
-Three containers:
+Two containers:
 
 | Service    | Image                     | Role                                                       |
 | ---------- | ------------------------- | ---------------------------------------------------------- |
 | `app`      | built from `Dockerfile`   | Next.js app; runs migrations + idempotent seed on start     |
 | `db`       | `pgvector/pgvector:pg16`  | PostgreSQL 16 with pgvector; not exposed to the host        |
-| `embedder` | built from `embedder/`    | CLIP ViT-L/14 behind `POST /embed`; internal-only           |
-
-`app` waits for both healthchecks before starting. Photos and database data live in named
+`app` waits for the database healthcheck before starting. Photos and database data live in named
 volumes (`uploads`, `pgdata`) and survive `docker compose down`.
 
-**The model.** 1.7 GB of CLIP weights are copied into the embedder image at build time (so the
-container never downloads anything at runtime), and they are deliberately **not in git**. Fetch
-them once per machine before the first build, or the embedder image fails to build:
-
-```bash
-npm run model:fetch              # pinned HuggingFace revision, sha256-checked
-npm run model:fetch -- --check   # verify an existing copy, download nothing
-```
-
-To browse the embedder's API docs (`/docs`, `/redoc`, `/openapi.json`), opt in:
-
-```bash
-docker compose -f docker-compose.yml -f compose.docs.yml up -d
-# publishes http://127.0.0.1:8000 — docs only; the app never needs this
-```
+Set `EMBEDDER_URL` to the HTTPS embedder domain and `EMBEDDER_API_KEY` to the matching secret
+before starting the stack. The Compose file requires both values.
 
 ### Without Docker (host dev server)
 
-The database and the embedder still run in containers; only the Next.js app runs on the host:
+The database runs in a container; the embedder remains the separately deployed HTTPS service:
 
 ```bash
 docker run -d --name laf-pg -e POSTGRES_USER=lostfound -e POSTGRES_PASSWORD=lostfound \
   -e POSTGRES_DB=lostfound -p 5433:5432 pgvector/pgvector:pg16
-npm run model:fetch          # the embedder image needs the weights in its build context
-docker compose build embedder
-docker run -d --name laf-embedder -p 8000:8000 lost-and-found-embedder
-
 cp .env.example .env
 # In .env:  DATABASE_URL=postgresql://lostfound:lostfound@127.0.0.1:5433/lostfound
-#           EMBEDDER_URL=http://localhost:8000
+#           EMBEDDER_URL=https://embedder.danpirante.dev
+#           EMBEDDER_API_KEY=the-aws-embedder-key
 #           EMBEDDER_API_KEY=              # set if the embedder requires a key
 
 npm install
@@ -283,12 +268,11 @@ Next.js app ── container: app (port 3000)
    │                  notifications, files, admin, health
    ├─ server components read through lib/records.ts (same tables, no HTTP hop)
    ├─ /uploads volume: original + resized photo variants
-   ├──────────────────────────┬───────────────────────────┐
-   ▼                          ▼                           ▼
-PostgreSQL 16 + pgvector   embedder sidecar            (optional docs)
-container: db              container: embedder         compose.docs.yml
-vectors, records           CLIP ViT-L/14, /embed       127.0.0.1:8000
-                           internal-only, no host port
+   ├──────────────────────────┬───────────────────────────
+   ▼                          ▼
+PostgreSQL 16 + pgvector   HTTPS embedder service
+container: db              embedder.danpirante.dev
+vectors, records           CLIP ViT-L/14, /embed
 ```
 
 ## Data model (summary)
@@ -310,8 +294,7 @@ to signed-in users; dates cannot be in the future and a return cannot precede it
 ## Project structure
 
 ```
-├── docker-compose.yml         # db + embedder + app; healthchecks and wait conditions
-├── compose.docs.yml           # opt-in override: publishes the embedder's API docs
+├── docker-compose.yml         # db + app; healthchecks and wait conditions
 ├── Dockerfile                 # 3-stage node:22 build; entrypoint migrates + seeds
 ├── docker-entrypoint.sh
 ├── .env.example               # every tunable, with comments
@@ -320,7 +303,7 @@ to signed-in users; dates cannot be in the future and a return cannot precede it
 │   ├── migrations/
 │   └── seed.ts                # the OSAS admin account, and nothing else
 ├── embedder/
-│   ├── main.py                # FastAPI: /embed, /health (+ /docs behind compose.docs.yml)
+│   ├── main.py                # FastAPI: /embed, /health, /docs, and API-key auth
 │   ├── Dockerfile             # model baked at build, pinned HF revision
 │   └── model-cache/           # build context for the weights; npm run model:fetch
 ├── scripts/                   # verification suites, audits, and the demo reset
@@ -352,8 +335,8 @@ SESSION_TTL_DAYS=7
 COOKIE_SECURE=0                    # keep 0 for http://localhost; 1 only behind HTTPS
 UPLOAD_DIR=/app/uploads
 MAX_UPLOAD_MB=8
-EMBEDDER_URL=http://embedder:8000
-EMBEDDER_API_KEY=                 # optional; sent as X-API-Key when set
+EMBEDDER_URL=https://embedder.danpirante.dev
+EMBEDDER_API_KEY=the-aws-embedder-key
 MATCH_BASELINE=0.6                 # raw cosine noise floor (calibration)
 MATCH_THRESHOLD=0.45               # calibrated units; provisional while pairs are collected
 MATCH_TOP_K=10
