@@ -183,6 +183,7 @@ docker run -d --name laf-embedder -p 8000:8000 lost-and-found-embedder
 cp .env.example .env
 # In .env:  DATABASE_URL=postgresql://lostfound:lostfound@127.0.0.1:5433/lostfound
 #           EMBEDDER_URL=http://localhost:8000
+#           EMBEDDER_API_KEY=              # set if the embedder requires a key
 
 npm install
 npm run db:generate          # Prisma 7 requires an explicit generate
@@ -193,6 +194,20 @@ npm run dev                  # http://localhost:3000
 
 > **Windows note:** use `127.0.0.1`, not `localhost`, for the database URL on the host.
 > `localhost` can resolve to IPv6 first and produce intermittent `P1017` connection errors.
+
+### Remote embedder
+
+The app can use an embedder hosted separately by setting `EMBEDDER_URL` in
+`.env`. Use a private VPN address where possible; otherwise expose the service
+only through HTTPS and set the same high-entropy `EMBEDDER_API_KEY` on both
+hosts. The key is sent as the `X-API-Key` header on embedder requests.
+
+```dotenv
+EMBEDDER_URL=https://embedder.example.com
+EMBEDDER_API_KEY=replace-with-a-long-random-secret
+```
+
+Do not expose an unauthenticated embedder directly to the public internet.
 > If port 3000 is taken, run `npm run dev -- -p 3100`.
 
 ### Resetting for a demo
@@ -338,6 +353,7 @@ COOKIE_SECURE=0                    # keep 0 for http://localhost; 1 only behind 
 UPLOAD_DIR=/app/uploads
 MAX_UPLOAD_MB=8
 EMBEDDER_URL=http://embedder:8000
+EMBEDDER_API_KEY=                 # optional; sent as X-API-Key when set
 MATCH_BASELINE=0.6                 # raw cosine noise floor (calibration)
 MATCH_THRESHOLD=0.45               # calibrated units; provisional while pairs are collected
 MATCH_TOP_K=10

@@ -14,8 +14,10 @@ happen here so callers can hand over the exact bytes they stored.
 import base64
 import binascii
 import io
+import os
+import secrets
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from PIL import Image, ImageOps
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
@@ -25,6 +27,7 @@ from sentence_transformers import SentenceTransformer
 MODEL_PATH = "/srv/models/clip-ViT-L-14"
 MODEL_ID = "clip-ViT-L-14"  # reported via /health and /embed for traceability
 DIMENSIONS = 768
+API_KEY = os.environ.get("EMBEDDER_API_KEY", "")
 
 # Loaded once per process; uvicorn runs a single worker so this is shared by
 # every request. Takes tens of seconds — compose gives the container a generous
@@ -56,7 +59,10 @@ def health():
 
 
 @app.post("/embed")
-def embed(request: EmbedRequest):
+def embed(request: EmbedRequest, x_api_key: str | None = Header(default=None)):
+    if API_KEY and not secrets.compare_digest(x_api_key or "", API_KEY):
+        raise HTTPException(status_code=401, detail="invalid embedder API key")
+
     try:
         raw = base64.b64decode(request.imageBase64, validate=True)
     except (binascii.Error, ValueError):

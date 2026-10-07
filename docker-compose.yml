@@ -5,6 +5,8 @@ services:
   embedder:
     build: ./embedder
     restart: unless-stopped
+    environment:
+      EMBEDDER_API_KEY: ${EMBEDDER_API_KEY:-}
     healthcheck:
       test:
         - CMD
@@ -49,7 +51,8 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-0}
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-8}
-      EMBEDDER_URL: http://embedder:8000
+      EMBEDDER_URL: ${EMBEDDER_URL:-http://embedder:8000}
+      EMBEDDER_API_KEY: ${EMBEDDER_API_KEY:-}
       # Scores are calibrated (raw cosine minus baseline, rescaled to 0-1)
       # before they are thresholded or shown. Tune both from the raw=/calibrated=
       # pairs in the [match] and [photo-search] log lines.

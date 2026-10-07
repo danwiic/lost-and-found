@@ -20,9 +20,14 @@ async function embedderFetch(
   init: RequestInit & { timeoutMs?: number } = {},
 ): Promise<Response> {
   const { timeoutMs = 30_000, ...rest } = init
+  const apiKey = process.env.EMBEDDER_API_KEY
   return fetch(`${config.embeddings.url}${path}`, {
     ...rest,
-    headers: { 'content-type': 'application/json', ...(rest.headers ?? {}) },
+    headers: {
+      'content-type': 'application/json',
+      ...(apiKey ? { 'x-api-key': apiKey } : {}),
+      ...(rest.headers ?? {}),
+    },
     signal: AbortSignal.timeout(timeoutMs),
   })
 }
