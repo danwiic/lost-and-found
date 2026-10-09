@@ -36,11 +36,30 @@ export async function POST(request: NextRequest, context: Context) {
     const viewer = await requireUser(request)
     const { id } = await context.params
 
+    if (viewer.role === 'ADMIN') {
+      throw forbidden('OSAS staff cannot file claims. Claims must be submitted by users.')
+    }
+
     const item = await prisma.item.findUnique({
       where: { id },
       select: { id: true, name: true, type: true, status: true, reporterId: true },
     })
     if (!item) throw notFound('That item does not exist.')
+    if (item.type !== 'FOUND') {
+      throw badRequest('Claims can only be filed for found items.')
+    }
+
+    const eligibleMatch = await prisma.match.findFirst({
+      where: {
+        foundItemId: item.id,
+        status: { not: 'DISMISSED' },
+        lostItem: { reporterId: viewer.id, type: 'LOST' },
+      },
+      select: { id: true },
+    })
+    if (!eligibleMatch) {
+      throw forbidden('You can only claim a found item matched to your lost report.')
+    }
 
     if (item.reporterId === viewer.id) {
       throw badRequest('You cannot file a claim for an item you reported yourself.')

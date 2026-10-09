@@ -287,7 +287,7 @@ export async function loadItem(
   const isOwner = item.reporterId === viewer.id
   const isAdmin = viewer.role === 'ADMIN'
 
-  const [claims, claimsCount] = await Promise.all([
+  const [claims, claimsCount, eligibleMatch] = await Promise.all([
     isOwner || isAdmin
       ? prisma.claim.findMany({
           where: { itemId: id },
@@ -327,6 +327,16 @@ export async function loadItem(
           },
         }),
     prisma.claim.count({ where: { itemId: id } }),
+    !isAdmin
+      ? prisma.match.findFirst({
+          where: {
+            foundItemId: id,
+            status: { not: MatchStatus.DISMISSED },
+            lostItem: { reporterId: viewer.id, type: 'LOST' },
+          },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
   ])
 
   const summaries: ClaimSummary[] = claims.map((claim) => ({
@@ -374,9 +384,15 @@ export async function loadItem(
         studentId: canSeeContact ? (reporter?.studentId ?? null) : null,
         contact: canSeeContact ? (reporter?.contact ?? null) : null,
       },
-      // Only the reporter and OSAS staff see the claims list, and the API
-      // refuses a claim on your own report.
-      claimable: !isOwner && open && myPendingClaim === null,
+      // Only students can claim found items. OSAS staff review claims rather
+      // than submitting them, and the API enforces the same boundary.
+      claimable:
+        item.type === 'FOUND' &&
+        !isOwner &&
+        !isAdmin &&
+        open &&
+        myPendingClaim === null &&
+        eligibleMatch !== null,
       myPendingClaim: isOwner || isAdmin ? null : myPendingClaim,
       canWithdraw: isOwner && item.status !== 'CLAIM_PENDING' && item.status !== 'RETURNED',
     },
