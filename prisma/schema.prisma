@@ -20,6 +20,11 @@ enum Role {
   ADMIN
 }
 
+enum AccountType {
+  STUDENT
+  PERSONNEL
+}
+
 enum ItemType {
   LOST
   FOUND
@@ -63,6 +68,7 @@ model User {
   studentId    String?
   contact      String?
   role         Role     @default(USER)
+  accountType  AccountType @default(STUDENT)
   /// Bumped by a password reset so every token signed before it is refused.
   sessionEpoch Int      @default(0)
   /// Consecutive wrong security answers; a run of them locks the questions.

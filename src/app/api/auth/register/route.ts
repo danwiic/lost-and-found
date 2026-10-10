@@ -6,12 +6,13 @@ import { Fields, ValidationError } from '@/lib/validation'
 
 export const dynamic = 'force-dynamic'
 
-/** Creates a student account and signs it in straight away. */
+/** Creates a student or personnel account and signs it in straight away. */
 export async function POST(request: NextRequest) {
   return handleRoute(async () => {
     const body = await readBody(request)
     const fields = new Fields(body)
 
+    const accountType = fields.requiredEnum('accountType', 'Account type', ['STUDENT', 'PERSONNEL'] as const)
     const name = fields.requiredText('name', 'Full name', { min: 2, max: 120 })
     const email = fields.email('email', 'Email', { required: true })
     const password = fields.password('password', 'Password')
@@ -46,6 +47,8 @@ export async function POST(request: NextRequest) {
         passwordHash: await hashPassword(password),
         studentId: studentId ?? null,
         contact: contact ?? null,
+        accountType,
+        role: accountType === 'PERSONNEL' ? 'ADMIN' : 'USER',
       },
       select: {
         id: true,
@@ -54,6 +57,7 @@ export async function POST(request: NextRequest) {
         studentId: true,
         contact: true,
         role: true,
+        accountType: true,
         sessionEpoch: true,
       },
     })
@@ -62,12 +66,15 @@ export async function POST(request: NextRequest) {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: 'USER',
+      role: user.role === 'ADMIN' ? 'ADMIN' : 'USER',
       epoch: user.sessionEpoch,
     })
 
     const { sessionEpoch: _sessionEpoch, ...safeUser } = user
 
-    return attachSessionCookie(json({ user: { ...safeUser, role: 'USER' } }, 201), token)
+    return attachSessionCookie(
+      json({ user: { ...safeUser, role: user.role === 'ADMIN' ? 'ADMIN' : 'USER' } }, 201),
+      token,
+    )
   })
 }

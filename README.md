@@ -21,13 +21,14 @@ Compose stack runs only the Next.js app and PostgreSQL; it does not download or
 build the 1.7 GB model.
 
 The seed creates exactly one account — the OSAS admin (`admin@cvsu.test` / `admin123`).
-Students register themselves, and every item in the system comes from a real report.
+Students and personnel register themselves, and every item in the system comes from a real report.
+Personnel accounts receive OSAS staff access; the signup choice is stored with the account.
 
 ---
 
 ## Features
 
-### Students
+### Students and personnel
 
 - **Register / sign in / sign out.** Registration signs the new account straight in.
 - **Password & recovery.** Change your password from the profile. Forgot it? Set security
@@ -69,9 +70,9 @@ Students register themselves, and every item in the system comes from a real rep
 - **Counter intake.** Log an item handed in at the office, recording who found it — the
   found-item form completed on the office's behalf, running through the same match-and-notify
   pipeline as any other report.
-- **Account desk.** Find a student by name, email or student ID and issue a temporary password
-  when they cannot sign in; the account stays flagged until they replace it at next sign-in.
-  Staff accounts cannot be reset from this screen.
+- **Account desk.** Find a student or personnel member by name, email or ID and issue a temporary
+  password when they cannot sign in; the account stays flagged until they replace it at next
+  sign-in. Staff accounts cannot be reset from this screen.
 
 ---
 

@@ -6,6 +6,7 @@ export type AccountRow = {
   email: string
   studentId: string | null
   contact: string | null
+  accountType: 'STUDENT' | 'PERSONNEL'
   role: 'USER' | 'ADMIN'
   /** True while a staff-issued temporary password is still in force. */
   mustChangePassword: boolean
@@ -72,6 +73,7 @@ export async function listAccounts({
       email: true,
       studentId: true,
       contact: true,
+      accountType: true,
       role: true,
       mustChangePassword: true,
       createdAt: true,
@@ -85,6 +87,7 @@ export async function listAccounts({
       email: user.email,
       studentId: user.studentId,
       contact: user.contact,
+      accountType: user.accountType,
       role: user.role === 'ADMIN' ? 'ADMIN' : 'USER',
       mustChangePassword: user.mustChangePassword,
       createdAt: user.createdAt.toISOString(),

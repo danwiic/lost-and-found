@@ -23,13 +23,13 @@ function accountsHref(q: string, page: number): string {
 }
 
 /**
- * The counter's account lookup: find a student, and hand them a temporary
+ * The counter's account lookup: find a student or personnel member, and hand them a temporary
  * password when they cannot sign in. It is one control on purpose — no editing,
  * no roles, no deletion. The office needs "help this person back in", and every
  * extra power on this screen would be a way to misuse it.
  *
  * The roster is listed before anyone searches, because half the counter
- * questions are "which account is mine?" — a student who cannot remember the
+ * questions are "which account is mine?" — someone who cannot remember the
  * email they registered with is better served by browsing names than by being
  * asked to type one. The search is a plain GET form, so it works before
  * JavaScript loads and every view is a URL worth sharing.
@@ -55,8 +55,8 @@ export default async function AdminAccountsPage({
     <div className="page-stack">
       <div className="space-y-6">
         <PageHeader
-          title="Student accounts"
-          description="Issue a temporary password when a student cannot sign in."
+          title="Student and personnel accounts"
+          description="Issue a temporary password when a student or personnel member cannot sign in."
         />
 
         <div className="border-t border-line pt-6">
@@ -86,7 +86,7 @@ export default async function AdminAccountsPage({
             Find an account
           </label>
           <p className="mt-1 text-xs text-ink-muted">
-            By name, email address, or student ID. Ask for a student ID before resetting anything.
+            By name, email address, or student or personnel ID. Ask for their ID before resetting anything.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <div className="relative min-w-0 flex-1">
@@ -120,7 +120,7 @@ export default async function AdminAccountsPage({
             message={
               searching
                 ? 'Check the spelling, or try the email address they registered with. Clear the search to browse the whole roster.'
-                : 'Students appear here as they create accounts.'
+                : 'Student and personnel accounts appear here as they are created.'
             }
           />
         ) : (
@@ -133,6 +133,11 @@ export default async function AdminAccountsPage({
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-2 text-[0.9375rem] font-medium">
                     {account.name}
+                    {account.role !== 'ADMIN' ? (
+                      <Badge tone="muted">
+                        {account.accountType === 'PERSONNEL' ? 'Personnel' : 'Student'}
+                      </Badge>
+                    ) : null}
                     {account.role === 'ADMIN' ? <Badge tone="accent">OSAS staff</Badge> : null}
                     {account.mustChangePassword ? (
                       <Badge tone="attention">Temporary password</Badge>

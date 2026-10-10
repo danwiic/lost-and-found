@@ -107,7 +107,7 @@ export function AccountMenu({
               className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-ink-muted transition-colors hover:bg-surface-sunk hover:text-ink"
             >
               <Icon name="copy" className="h-4 w-4" />
-              Student accounts
+              Student and personnel accounts
             </Link>
           ) : null}
 

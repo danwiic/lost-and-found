@@ -6,9 +6,11 @@ import { PasswordInput } from '@/components/auth/PasswordInput'
 import { buttonClass, Spinner } from '@/components/ui/Button'
 import { ErrorNote } from '@/components/ui/EmptyState'
 import { Field, inputClass } from '@/components/ui/Field'
+import { Icon } from '@/components/ui/Icon'
 import { parseFailure } from '@/lib/client-api'
 
 type FieldErrors = {
+  accountType?: string
   name?: string
   email?: string
   password?: string
@@ -27,7 +29,7 @@ const CONTACT_MAX = 120
 const PASSWORD_MAX = 200
 
 /**
- * Creates a student account. The API signs the new account in straight away, so
+ * Creates a student or personnel account. The API signs the new account in straight away, so
  * a successful registration lands on the desk rather than back at a sign-in
  * form. Validation is per-field and happens on blur and on submit — never while
  * the user is still typing (agents/UX.md §5.4). The six fields are split into
@@ -38,6 +40,7 @@ export function RegisterForm() {
   const router = useRouter()
 
   const [values, setValues] = useState({
+    accountType: 'STUDENT' as 'STUDENT' | 'PERSONNEL',
     name: '',
     email: '',
     password: '',
@@ -128,6 +131,7 @@ export function RegisterForm() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
+          accountType: values.accountType,
           name: values.name.trim(),
           email: values.email.trim(),
           password: values.password,
@@ -170,6 +174,38 @@ export function RegisterForm() {
 
       <section className="space-y-6">
         <h2 className="text-base font-semibold">Your account</h2>
+
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-ink">I am signing up as</legend>
+          <p className="text-xs text-ink-muted">
+            Personnel accounts have OSAS staff access.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { value: 'STUDENT' as const, label: 'Student' },
+              { value: 'PERSONNEL' as const, label: 'Personnel' },
+            ].map(option => (
+              <label
+                key={option.value}
+                className={`flex cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  values.accountType === option.value
+                    ? 'border-accent bg-accent-soft text-accent'
+                    : 'border-line bg-surface text-ink-muted hover:border-line-strong hover:text-ink'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="accountType"
+                  value={option.value}
+                  checked={values.accountType === option.value}
+                  onChange={() => setValues(current => ({ ...current, accountType: option.value }))}
+                  className="sr-only"
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         <Field id="name" label="Full name" error={errors.name}>
           {props => (
@@ -275,62 +311,70 @@ export function RegisterForm() {
         </Field>
       </section>
 
-      <section className="space-y-6 border-t border-line pt-8">
-        <div>
-          <h2 className="text-base font-semibold">Details OSAS may need</h2>
-          <p className="mt-1 text-xs text-ink-muted">
-            Optional — they make a claim faster to verify and to schedule a collection.
-          </p>
+      <details className="group border-t border-line pt-6">
+        <summary className="cursor-pointer list-none rounded-lg text-base font-semibold text-ink outline-offset-4 marker:hidden focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center justify-between gap-4">
+            Additional information
+            <Icon
+              name="arrow"
+              className="h-4 w-4 rotate-90 text-accent transition-transform duration-200 group-open:-rotate-90"
+            />
+          </span>
+          <span className="mt-1 block text-xs font-normal text-ink-muted">
+            Optional — helps OSAS verify claims and schedule collection.
+          </span>
+        </summary>
+
+        <div className="mt-6 space-y-6">
+          <Field
+            id="studentId"
+            label="Student or personnel ID"
+            optionalHint="Optional"
+            error={errors.studentId}
+          >
+            {props => (
+              <input
+                {...props}
+                type="text"
+                name="studentId"
+                maxLength={STUDENT_ID_MAX}
+                placeholder="202212345"
+                value={values.studentId}
+                onChange={event => {
+                  set('studentId')(event.target.value)
+                  clear('studentId')
+                }}
+                className={inputClass({ invalid: Boolean(errors.studentId) })}
+              />
+            )}
+          </Field>
+
+          <Field
+            id="contact"
+            label="Contact number"
+            optionalHint="Optional"
+            hint="Used on a claim so OSAS can reach you about collection."
+            error={errors.contact}
+          >
+            {props => (
+              <input
+                {...props}
+                type="tel"
+                name="contact"
+                autoComplete="tel"
+                maxLength={CONTACT_MAX}
+                placeholder="0917 000 0000"
+                value={values.contact}
+                onChange={event => {
+                  set('contact')(event.target.value)
+                  clear('contact')
+                }}
+                className={inputClass({ invalid: Boolean(errors.contact) })}
+              />
+            )}
+          </Field>
         </div>
-
-        <Field
-          id="studentId"
-          label="Student / personnel ID"
-          optionalHint="Optional"
-          error={errors.studentId}
-        >
-          {props => (
-            <input
-              {...props}
-              type="text"
-              name="studentId"
-              maxLength={STUDENT_ID_MAX}
-              placeholder="202212345"
-              value={values.studentId}
-              onChange={event => {
-                set('studentId')(event.target.value)
-                clear('studentId')
-              }}
-              className={inputClass({ invalid: Boolean(errors.studentId) })}
-            />
-          )}
-        </Field>
-
-        <Field
-          id="contact"
-          label="Contact number"
-          optionalHint="Optional"
-          hint="Used on a claim so OSAS can reach you about collection."
-          error={errors.contact}
-        >
-          {props => (
-            <input
-              {...props}
-              type="tel"
-              name="contact"
-              autoComplete="tel"
-              maxLength={CONTACT_MAX}
-              placeholder="0917 000 0000"
-              value={values.contact}
-              onChange={event => {
-                set('contact')(event.target.value)
-                clear('contact')
-              }}
-              className={inputClass({ invalid: Boolean(errors.contact) })}
-            />
-          )}
-        </Field>
-      </section>
+      </details>
 
       <button
         type="submit"
